@@ -82,6 +82,51 @@ function newDiag(){return{step:0,isNew:false,newC:{name:"",age:"",phone:""},cId:
 function getKey(){return localStorage.getItem("riman_key")||"";}
 function setKey(k){localStorage.setItem("riman_key",k);}
 function saveDB(){try{localStorage.setItem("riman_v2",JSON.stringify(customers));}catch(e){}}
+
+/* ===== USAGE COUNTER ===== */
+var WARN_LIMIT=50;
+var MAX_LIMIT=100;
+function getCount(){return parseInt(localStorage.getItem("riman_count")||"0");}
+function addCount(){var n=getCount()+1;localStorage.setItem("riman_count",String(n));return n;}
+function checkLimit(){
+  var n=getCount();
+  if(n>=MAX_LIMIT){showLimitEnd();return false;}
+  return true;
+}
+function showLimitEnd(){
+  var mr=document.getElementById("modal");mr.innerHTML="";
+  var ov=h("div","movo");
+  var m=h("div","mov",{textAlign:"center"});
+  m.appendChild(h("div","",{fontSize:"48px",marginBottom:"8px"},["🌸"]));
+  m.appendChild(h("h2","serif",{fontSize:"20px",fontWeight:"500",marginBottom:"12px",color:"var(--p600)"},["サービス終了のご案内"]));
+  m.appendChild(h("p","",{fontSize:"14px",color:"var(--ts)",lineHeight:"1.8",marginBottom:"20px"},["無料体験（100回）が終了しました。引き続きご利用をご希望の方はお申し込みください。"]));
+  var box=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",textAlign:"left",marginBottom:"16px"});
+  box.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",marginBottom:"8px",fontWeight:"500"},["お申し込み・お問い合わせ"]));
+  box.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",color:"var(--p600)",marginBottom:"4px"},["株式会社PRIAMOS"]));
+  box.appendChild(h("p","",{fontSize:"13px",color:"var(--ts)",marginBottom:"4px"},["📧 azabumin@gmail.com"]));
+  box.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["担当者よりご連絡いたします。"]));
+  m.appendChild(box);
+  m.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)"},["※ 無料体験は100回診断まで利用可能です"]));
+  ov.appendChild(m);
+  mr.appendChild(ov);
+}
+function showWarnPopup(count){
+  var mr=document.getElementById("modal");mr.innerHTML="";
+  var ov=h("div","movo");
+  var m=h("div","mov",{textAlign:"center"});
+  m.appendChild(h("div","",{fontSize:"40px",marginBottom:"8px"},["💡"]));
+  m.appendChild(h("h2","serif",{fontSize:"18px",fontWeight:"500",marginBottom:"12px",color:"var(--p600)"},["残り"+(MAX_LIMIT-count)+"回のご案内"]));
+  m.appendChild(h("p","",{fontSize:"14px",color:"var(--ts)",lineHeight:"1.8",marginBottom:"20px"},["無料体験の診断回数が残り"+(MAX_LIMIT-count)+"回となりました。引き続きご利用をご希望の方はお早めにお申し込みください。"]));
+  var box=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",textAlign:"left",marginBottom:"16px"});
+  box.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",marginBottom:"8px",fontWeight:"500"},["お申し込み・お問い合わせ"]));
+  box.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",color:"var(--p600)",marginBottom:"4px"},["株式会社PRIAMOS"]));
+  box.appendChild(h("p","",{fontSize:"13px",color:"var(--ts)",marginBottom:"4px"},["📧 azabumin@gmail.com"]));
+  box.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["担当者よりご連絡いたします。"]));
+  m.appendChild(box);
+  m.appendChild(mkBtn("閉じる",function(){mr.innerHTML="";},"btn bp bw"));
+  ov.appendChild(m);ov.addEventListener("click",function(e){if(e.target===ov)mr.innerHTML="";});
+  mr.appendChild(ov);
+}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function today(){return new Date().toISOString().split("T")[0];}
 
@@ -155,7 +200,7 @@ function renderNav(){
       b.addEventListener("click",function(){
         if(tab.id==="_set"){showSettings();return;}
         S.tab=tab.id;
-        if(tab.id==="diagnosis")S.diag=newDiag();
+        if(tab.id==="diagnosis"){if(!checkLimit())return;S.diag=newDiag();}
         S.view=tab.id;
         render();
       });
@@ -221,10 +266,12 @@ function renderHome(c){
     h("h1","serif",{fontSize:"22px",fontWeight:"500",marginTop:"2px"},["ダッシュボード"])
   ]));
 
-  var sg=h("div","g2",{marginBottom:"20px"});
+  var sg=h("div","",{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"20px"});
+  var _rem=MAX_LIMIT-getCount();
   var stats=[
     {l:"登録会員",v:customers.length,ic:"ti-users"},
-    {l:"診断済み",v:customers.filter(function(x){return (x.diagnoses||[]).length>0;}).length,ic:"ti-clipboard-check"}
+    {l:"診断済み",v:customers.filter(function(x){return (x.diagnoses||[]).length>0;}).length,ic:"ti-clipboard-check"},
+    {l:"残り診断回数",v:_rem<0?0:_rem,ic:"ti-refresh"}
   ];
   for(var si=0;si<stats.length;si++){
     (function(st){
@@ -284,7 +331,7 @@ function renderHome(c){
   }
 
   sc.appendChild(h("div","",{marginTop:"16px"},[
-    mkBtn("＋ 新規カルテを作成",function(){S.diag=newDiag();S.view="diagnosis";S.tab="diagnosis";render();},"btn bp bw")
+    mkBtn("＋ 新規カルテを作成",function(){if(!checkLimit())return;S.diag=newDiag();S.view="diagnosis";S.tab="diagnosis";render();},"btn bp bw")
   ]));
   c.appendChild(sc);
 }
@@ -668,6 +715,10 @@ function renderDiag(c){
       var base64=d.photo.split(",")[1];
       var mediaType=d.photo.indexOf("data:image/png")===0?"image/png":"image/jpeg";
       var prompt="あなたは経験豊富な美容専門家です。この顔写真から肌状態を詳しく分析してください。\n\nお客様情報:\n- 名前: "+cu.name+"\n- 年齢: "+(cu.age||"不明")+"歳代\n- 睡眠の質: "+d.ls.sleep+"\n- 水分摂取: "+d.ls.water+"\n- 紫外線対策: "+d.ls.uv+"\n- 備考: "+(d.note||"なし")+"\n\n写真から以下を分析し、JSONのみで回答してください（説明文・コードブロック記号は不要）:\n\n{\"skinType\":\"乾燥肌/普通肌/混合肌/脂性肌/敏感肌のいずれか1つ\",\"skinDiagnosis\":\"写真から見た肌の総合診断（60字以内）\",\"concerns\":[\"写真から判断したお悩み1\",\"お悩み2\",\"お悩み3\"],\"skinCondition\":{\"hydration\":保水力1から10,\"elasticity\":弾力1から10,\"sensitivity\":敏感度1から10,\"brightness\":透明感1から10},\"advice\":[\"スキンケアアドバイス1\",\"アドバイス2\",\"アドバイス3\",\"アドバイス4\"],\"productCategories\":[\"RIMANおすすめカテゴリ1\",\"カテゴリ2\",\"カテゴリ3\"],\"urgencyLevel\":\"高または中または低\"}";
+
+      if(!checkLimit())return;
+      var newCount=addCount();
+      if(newCount===WARN_LIMIT){setTimeout(function(){showWarnPopup(newCount);},1500);}
 
       fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
