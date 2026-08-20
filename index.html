@@ -287,10 +287,17 @@ function showSettings(){
 function renderHome(c){
   var sc=h("div","scr");
 
-  sc.appendChild(h("div","",{marginBottom:"24px"},[
-    h("p","",{fontSize:"12px",color:"var(--tm)"},["RIMAN KOREA 肌カルテ管理"]),
-    h("h1","serif",{fontSize:"22px",fontWeight:"500",marginTop:"2px"},["ダッシュボード"])
-  ]));
+  var titleRow=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"24px"});
+  var titleInfo=h("div");
+  titleInfo.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)"},["RIMAN KOREA 肌カルテ管理"]));
+  titleInfo.appendChild(h("h1","serif",{fontSize:"22px",fontWeight:"500",marginTop:"2px"},["ダッシュボード"]));
+  titleRow.appendChild(titleInfo);
+  var adminIconBtn=document.createElement("button");
+  adminIconBtn.style.cssText="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tm);font-size:12px;cursor:pointer;padding:6px 10px;margin-top:4px;display:flex;align-items:center;gap:4px;";
+  adminIconBtn.innerHTML="&#9881; 管理者";
+  adminIconBtn.addEventListener("click",function(){checkAdmin(function(){showSettings();});});
+  titleRow.appendChild(adminIconBtn);
+  sc.appendChild(titleRow);
 
   var sg=h("div","",{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"20px"});
   var _rem=MAX_LIMIT-getCount();
@@ -359,15 +366,6 @@ function renderHome(c){
   sc.appendChild(h("div","",{marginTop:"16px"},[
     mkBtn("＋ 新規カルテを作成",function(){if(!checkLimit())return;S.diag=newDiag();S.view="diagnosis";S.tab="diagnosis";render();},"btn bp bw")
   ]));
-
-  /* 관리자 버튼 - 눈에 안 띄게 하단에 배치 */
-  var adminArea=h("div","",{textAlign:"center",marginTop:"32px",paddingBottom:"16px"});
-  var adminBtn=document.createElement("button");
-  adminBtn.style.cssText="background:none;border:none;color:var(--tm);font-size:12px;cursor:pointer;padding:8px 16px;border:1px solid var(--bd);border-radius:20px;";
-  adminBtn.textContent="⚙ 管理者";
-  adminBtn.addEventListener("click",function(){checkAdmin(function(){showSettings();});});
-  adminArea.appendChild(adminBtn);
-  sc.appendChild(adminArea);
 
   c.appendChild(sc);
 }
