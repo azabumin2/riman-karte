@@ -363,8 +363,8 @@ function renderHome(c){
   /* 관리자 버튼 - 눈에 안 띄게 하단에 배치 */
   var adminArea=h("div","",{textAlign:"center",marginTop:"32px",paddingBottom:"16px"});
   var adminBtn=document.createElement("button");
-  adminBtn.style.cssText="background:none;border:none;color:var(--bd);font-size:11px;cursor:pointer;padding:4px 8px;";
-  adminBtn.textContent="管理者";
+  adminBtn.style.cssText="background:none;border:none;color:var(--tm);font-size:12px;cursor:pointer;padding:8px 16px;border:1px solid var(--bd);border-radius:20px;";
+  adminBtn.textContent="⚙ 管理者";
   adminBtn.addEventListener("click",function(){checkAdmin(function(){showSettings();});});
   adminArea.appendChild(adminBtn);
   sc.appendChild(adminArea);
