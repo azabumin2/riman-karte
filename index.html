@@ -189,8 +189,7 @@ function renderNav(){
     {id:"home",ic:"ti-home",l:"ホーム"},
     {id:"members",ic:"ti-users",l:"会員"},
     {id:"diagnosis",ic:"ti-camera",l:"診断"},
-    {id:"products",ic:"ti-leaf",l:"商品"},
-    {id:"_set",ic:"ti-settings",l:"設定"}
+    {id:"products",ic:"ti-leaf",l:"商品"}
   ];
   for(var i=0;i<tabs.length;i++){
     (function(tab){
@@ -217,6 +216,33 @@ function render(){
 }
 
 /* ===== SETTINGS ===== */
+var ADMIN_PW="priamos2024";
+function checkAdmin(callback){
+  var mr=document.getElementById("modal");mr.innerHTML="";
+  var ov=h("div","movo");
+  var m=h("div","mov",{textAlign:"center"});
+  m.appendChild(h("div","",{fontSize:"36px",marginBottom:"8px"},["🔐"]));
+  m.appendChild(h("h2","serif",{fontSize:"18px",fontWeight:"500",marginBottom:"4px"},["管理者認証"]));
+  m.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginBottom:"16px"},["管理者パスワードを入力してください"]));
+  var pw=document.createElement("input");
+  pw.type="password";pw.placeholder="パスワード";
+  pw.style.cssText="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--bds);background:var(--s2);color:var(--tp);font-size:15px;box-sizing:border-box;margin-bottom:8px;outline:none;text-align:center;letter-spacing:4px;";
+  m.appendChild(pw);
+  var errMsg=h("p","",{fontSize:"12px",color:"var(--dc)",marginBottom:"12px",minHeight:"18px"},[""]);
+  m.appendChild(errMsg);
+  var okBtn=mkBtn("確認",function(){
+    if(pw.value===ADMIN_PW){mr.innerHTML="";callback();}
+    else{errMsg.textContent="パスワードが違います";pw.value="";pw.focus();}
+  },"btn bp bw");
+  m.appendChild(okBtn);
+  var canBtn=mkBtn("キャンセル",function(){mr.innerHTML="";},"btn bg bw");
+  canBtn.style.marginTop="8px";
+  m.appendChild(canBtn);
+  pw.addEventListener("keydown",function(e){if(e.key==="Enter")okBtn.click();});
+  ov.appendChild(m);
+  mr.appendChild(ov);
+  setTimeout(function(){pw.focus();},100);
+}
 function showSettings(){
   var mr=document.getElementById("modal"); mr.innerHTML="";
   var ov=h("div","movo");
@@ -333,6 +359,16 @@ function renderHome(c){
   sc.appendChild(h("div","",{marginTop:"16px"},[
     mkBtn("＋ 新規カルテを作成",function(){if(!checkLimit())return;S.diag=newDiag();S.view="diagnosis";S.tab="diagnosis";render();},"btn bp bw")
   ]));
+
+  /* 관리자 버튼 - 눈에 안 띄게 하단에 배치 */
+  var adminArea=h("div","",{textAlign:"center",marginTop:"32px",paddingBottom:"16px"});
+  var adminBtn=document.createElement("button");
+  adminBtn.style.cssText="background:none;border:none;color:var(--bd);font-size:11px;cursor:pointer;padding:4px 8px;";
+  adminBtn.textContent="管理者";
+  adminBtn.addEventListener("click",function(){checkAdmin(function(){showSettings();});});
+  adminArea.appendChild(adminBtn);
+  sc.appendChild(adminArea);
+
   c.appendChild(sc);
 }
 
