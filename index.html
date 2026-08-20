@@ -44,10 +44,9 @@ button,input,textarea{font-family:inherit;}
 .fld input,.fld textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bds);background:var(--s2);color:var(--tp);font-size:14px;outline:none;}
 .fld textarea{resize:vertical;min-height:62px;display:block;}
 .tag{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:500;}
-.chip{padding:8px 10px;border-radius:var(--r);font-size:12px;border:1px solid var(--bds);background:var(--s2);color:var(--ts);cursor:pointer;text-align:center;user-select:none;}
-.chip.on{border:2px solid var(--p400);background:var(--p50);color:var(--p600);font-weight:500;}
 .av{border-radius:50%;background:linear-gradient(135deg,var(--p100),var(--p400));display:flex;align-items:center;justify-content:center;color:var(--p800);font-weight:500;flex-shrink:0;}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .btr{flex:1;background:var(--s1);border-radius:3px;height:6px;overflow:hidden;}
 .bf{height:100%;border-radius:3px;transition:width .8s ease;}
 .movo{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
@@ -66,157 +65,67 @@ button,input,textarea{font-family:inherit;}
   <div id="modal"></div>
 </div>
 <script>
-/* ===== CONSTANTS ===== */
-var INIT=[
-  {id:"c1",name:"田中 美代子",age:52,phone:"090-1234-5678",skinType:"乾燥肌",concerns:["シワ・たるみ","シミ・くすみ"],memo:"香料に敏感",diagnoses:[],lastDiagnosis:"2026-06-20",createdAt:"2026-05-01"},
-  {id:"c2",name:"鈴木 恵子",age:45,phone:"080-9876-5432",skinType:"混合肌",concerns:["毛穴","テカリ"],memo:"",diagnoses:[],lastDiagnosis:"2026-06-15",createdAt:"2026-04-15"},
-  {id:"c3",name:"山田 花子",age:48,phone:"070-5555-1234",skinType:"敏感肌",concerns:["赤み","乾燥"],memo:"アルコール不可",diagnoses:[],lastDiagnosis:"2026-06-10",createdAt:"2026-03-20"}
-];
-var SKINC={"乾燥肌":{bg:"#FFF0E6",c:"#C47B3A"},"普通肌":{bg:"#E8F5E9",c:"#388E3C"},"混合肌":{bg:"#F3E5F5",c:"#7B1FA2"},"脂性肌":{bg:"#E3F2FD",c:"#1565C0"},"敏感肌":{bg:"#FFEBEE",c:"#C62828"}};
+/* ===== 설정값 ===== */
+var PER_DEVICE_LIMIT = 5;   /* 1인당 최대 진단 횟수 */
+var ADMIN_EMAIL = "azabumin@gmail.com";
+var ADMIN_PW = "priamos2024";
+
+/* ===== 초기 데이터 ===== */
+var SKIN_COLORS = {"乾燥肌":{bg:"#FFF0E6",c:"#C47B3A"},"普通肌":{bg:"#E8F5E9",c:"#388E3C"},"混合肌":{bg:"#F3E5F5",c:"#7B1FA2"},"脂性肌":{bg:"#E3F2FD",c:"#1565C0"},"敏感肌":{bg:"#FFEBEE",c:"#C62828"}};
 
 /* ===== STATE ===== */
-var customers=[];
-try{var _s=localStorage.getItem("riman_v2");customers=_s?JSON.parse(_s):INIT.slice();}catch(e){customers=INIT.slice();}
-var S={view:"home",tab:"home",selId:null,diag:newDiag()};
+var customers = [];
+try { var _s = localStorage.getItem("riman_v2"); customers = _s ? JSON.parse(_s) : []; } catch(e) { customers = []; }
+var S = {view:"home", tab:"home", selId:null, diag:newDiag()};
+
 function newDiag(){return{step:0,isNew:false,newC:{name:"",age:"",phone:""},cId:"",photo:null,ls:{sleep:"",water:"",uv:""},note:"",loading:false,result:null,error:""};}
 function getKey(){return localStorage.getItem("riman_key")||"";}
 function setKey(k){localStorage.setItem("riman_key",k);}
 function saveDB(){try{localStorage.setItem("riman_v2",JSON.stringify(customers));}catch(e){}}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function today(){return new Date().toISOString().split("T")[0];}
 
-/* ===== USAGE COUNTER ===== */
-var WARN_LIMIT=50;
-var MAX_LIMIT=100;
+/* ===== 사용 횟수 관리 ===== */
 function getCount(){return parseInt(localStorage.getItem("riman_count")||"0");}
 function addCount(){var n=getCount()+1;localStorage.setItem("riman_count",String(n));return n;}
-function checkLimit(){
-  var n=getCount();
-  if(n>=MAX_LIMIT){showLimitEnd();return false;}
-  return true;
+function isLimitReached(){return getCount()>=PER_DEVICE_LIMIT;}
+
+/* ===== DOM 헬퍼 ===== */
+function h(tag,cls,sty,ch){
+  var e=document.createElement(tag);
+  if(cls)e.className=cls;
+  if(sty&&typeof sty==="object"&&!Array.isArray(sty)){var ks=Object.keys(sty);for(var k=0;k<ks.length;k++)e.style[ks[k]]=sty[ks[k]];}
+  var arr=Array.isArray(ch)?ch:(Array.isArray(sty)?sty:[]);
+  for(var i=0;i<arr.length;i++){if(arr[i]==null)continue;e.appendChild(typeof arr[i]==="string"?document.createTextNode(arr[i]):arr[i]);}
+  return e;
 }
-function showLimitEnd(){
+function ic(name,sty){var i=document.createElement("i");i.className="ti "+name;i.setAttribute("aria-hidden","true");if(sty&&typeof sty==="object"){var ks=Object.keys(sty);for(var k=0;k<ks.length;k++)i.style[ks[k]]=sty[ks[k]];}return i;}
+function av(name,sz){return h("div","av",{width:sz+"px",height:sz+"px",fontSize:Math.round(sz*.38)+"px"},[name.charAt(0)]);}
+function stag(type){var s=SKIN_COLORS[type]||{bg:"var(--p50)",c:"var(--p600)"};return h("span","tag",{background:s.bg,color:s.c},[type]);}
+function mkBtn(lbl,oc,cls,dis){var b=h("button",cls||"btn bp");b.innerHTML=lbl;if(oc)b.addEventListener("click",oc);if(dis)b.disabled=true;return b;}
+function mkFld(lbl,val,oc,type,ph){var w=h("div","fld");if(lbl)w.appendChild(h("label","",{},[lbl]));var i=document.createElement("input");i.type=type||"text";i.value=val||"";if(ph)i.placeholder=ph;i.addEventListener("input",function(e){oc(e.target.value);});w.appendChild(i);return w;}
+function txt(str){return document.createTextNode(str);}
+function row(ch,gap){var d=h("div","",{display:"flex",gap:gap||"8px"});for(var i=0;i<ch.length;i++)if(ch[i])d.appendChild(ch[i]);return d;}
+
+/* ===== 제한 초과 화면 ===== */
+function showLimitScreen(){
   var mr=document.getElementById("modal");mr.innerHTML="";
   var ov=h("div","movo");
   var m=h("div","mov",{textAlign:"center"});
   m.appendChild(h("div","",{fontSize:"48px",marginBottom:"8px"},["🌸"]));
-  m.appendChild(h("h2","serif",{fontSize:"20px",fontWeight:"500",marginBottom:"12px",color:"var(--p600)"},["サービス終了のご案内"]));
-  m.appendChild(h("p","",{fontSize:"14px",color:"var(--ts)",lineHeight:"1.8",marginBottom:"20px"},["無料体験（100回）が終了しました。引き続きご利用をご希望の方はお申し込みください。"]));
+  m.appendChild(h("h2","serif",{fontSize:"20px",fontWeight:"500",marginBottom:"12px",color:"var(--p600)"},["無料診断回数のご案内"]));
+  m.appendChild(h("p","",{fontSize:"14px",color:"var(--ts)",lineHeight:"1.8",marginBottom:"20px"},["無料体験（5回）をご利用いただきました。\n引き続きご利用をご希望の方は\n管理者までご連絡ください。"]));
   var box=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",textAlign:"left",marginBottom:"16px"});
-  box.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",marginBottom:"8px",fontWeight:"500"},["お申し込み・お問い合わせ"]));
+  box.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",marginBottom:"8px",fontWeight:"500"},["お問い合わせ先"]));
   box.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",color:"var(--p600)",marginBottom:"4px"},["株式会社PRIAMOS"]));
-  box.appendChild(h("p","",{fontSize:"13px",color:"var(--ts)",marginBottom:"4px"},["📧 azabumin@gmail.com"]));
-  box.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["担当者よりご連絡いたします。"]));
+  box.appendChild(h("p","",{fontSize:"13px",color:"var(--ts)"},["📧 "+ADMIN_EMAIL]));
   m.appendChild(box);
-  m.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)"},["※ 無料体験は100回診断まで利用可能です"]));
+  m.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)"},["※ 無料体験は1端末5回まで診断できます"]));
   ov.appendChild(m);
   mr.appendChild(ov);
 }
-function showWarnPopup(count){
-  var mr=document.getElementById("modal");mr.innerHTML="";
-  var ov=h("div","movo");
-  var m=h("div","mov",{textAlign:"center"});
-  m.appendChild(h("div","",{fontSize:"40px",marginBottom:"8px"},["💡"]));
-  m.appendChild(h("h2","serif",{fontSize:"18px",fontWeight:"500",marginBottom:"12px",color:"var(--p600)"},["残り"+(MAX_LIMIT-count)+"回のご案内"]));
-  m.appendChild(h("p","",{fontSize:"14px",color:"var(--ts)",lineHeight:"1.8",marginBottom:"20px"},["無料体験の診断回数が残り"+(MAX_LIMIT-count)+"回となりました。引き続きご利用をご希望の方はお早めにお申し込みください。"]));
-  var box=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",textAlign:"left",marginBottom:"16px"});
-  box.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",marginBottom:"8px",fontWeight:"500"},["お申し込み・お問い合わせ"]));
-  box.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",color:"var(--p600)",marginBottom:"4px"},["株式会社PRIAMOS"]));
-  box.appendChild(h("p","",{fontSize:"13px",color:"var(--ts)",marginBottom:"4px"},["📧 azabumin@gmail.com"]));
-  box.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["担当者よりご連絡いたします。"]));
-  m.appendChild(box);
-  m.appendChild(mkBtn("閉じる",function(){mr.innerHTML="";},"btn bp bw"));
-  ov.appendChild(m);ov.addEventListener("click",function(e){if(e.target===ov)mr.innerHTML="";});
-  mr.appendChild(ov);
-}
-function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
-function today(){return new Date().toISOString().split("T")[0];}
 
-/* ===== DOM HELPERS ===== */
-/* h(tag, className, styleObj, childrenArray) - all params optional except tag */
-function h(tag,cls,sty,ch){
-  var e=document.createElement(tag);
-  if(cls)e.className=cls;
-  if(sty&&typeof sty==="object"&&!Array.isArray(sty)){
-    var keys=Object.keys(sty);
-    for(var k=0;k<keys.length;k++)e.style[keys[k]]=sty[keys[k]];
-  }
-  var arr=Array.isArray(ch)?ch:(Array.isArray(sty)?sty:[]);
-  for(var i=0;i<arr.length;i++){
-    if(arr[i]==null)continue;
-    e.appendChild(typeof arr[i]==="string"?document.createTextNode(arr[i]):arr[i]);
-  }
-  return e;
-}
-function ic(name,sty){
-  var i=document.createElement("i");
-  i.className="ti "+name;
-  i.setAttribute("aria-hidden","true");
-  if(sty&&typeof sty==="object"){var keys=Object.keys(sty);for(var k=0;k<keys.length;k++)i.style[keys[k]]=sty[keys[k]];}
-  return i;
-}
-function av(name,sz){
-  return h("div","av",{width:sz+"px",height:sz+"px",fontSize:Math.round(sz*.38)+"px"},[name.charAt(0)]);
-}
-function stag(type){
-  var s=SKINC[type]||{bg:"var(--p50)",c:"var(--p600)"};
-  return h("span","tag",{background:s.bg,color:s.c},[type]);
-}
-function mkBtn(lbl,oc,cls,dis){
-  var b=h("button",cls||"btn bp");
-  b.innerHTML=lbl;
-  if(oc)b.addEventListener("click",oc);
-  if(dis)b.disabled=true;
-  return b;
-}
-function mkFld(lbl,val,oc,type,ph){
-  var w=h("div","fld");
-  if(lbl)w.appendChild(h("label","",{},[lbl]));
-  var i=document.createElement("input");
-  i.type=type||"text"; i.value=val||""; if(ph)i.placeholder=ph;
-  i.addEventListener("input",function(e){oc(e.target.value);});
-  w.appendChild(i); return w;
-}
-function txt(str){return document.createTextNode(str);}
-function row(children,gap){
-  var d=h("div","",{display:"flex",gap:gap||"8px"});
-  for(var i=0;i<children.length;i++)if(children[i])d.appendChild(children[i]);
-  return d;
-}
-
-/* ===== NAVIGATION ===== */
-function renderNav(){
-  var nav=document.getElementById("nav"); nav.innerHTML="";
-  var tabs=[
-    {id:"home",ic:"ti-home",l:"ホーム"},
-    {id:"members",ic:"ti-users",l:"会員"},
-    {id:"diagnosis",ic:"ti-camera",l:"診断"},
-    {id:"products",ic:"ti-leaf",l:"商品"}
-  ];
-  for(var i=0;i<tabs.length;i++){
-    (function(tab){
-      var b=h("button","ntab"+(S.tab===tab.id?" on":""));
-      b.appendChild(ic(tab.ic));
-      b.appendChild(h("span","",{},[tab.l]));
-      b.addEventListener("click",function(){
-        if(tab.id==="_set"){showSettings();return;}
-        S.tab=tab.id;
-        if(tab.id==="diagnosis"){if(!checkLimit())return;S.diag=newDiag();}
-        S.view=tab.id;
-        render();
-      });
-      nav.appendChild(b);
-    })(tabs[i]);
-  }
-}
-
-function render(){
-  renderNav();
-  var c=document.getElementById("content"); c.innerHTML="";
-  var views={home:renderHome,members:renderMembers,detail:renderDetail,diagnosis:renderDiag,products:renderProducts};
-  (views[S.view]||renderHome)(c);
-}
-
-/* ===== SETTINGS ===== */
-var ADMIN_PW="priamos2024";
+/* ===== 관리자 인증 ===== */
 function checkAdmin(callback){
   var mr=document.getElementById("modal");mr.innerHTML="";
   var ov=h("div","movo");
@@ -224,115 +133,127 @@ function checkAdmin(callback){
   m.appendChild(h("div","",{fontSize:"36px",marginBottom:"8px"},["🔐"]));
   m.appendChild(h("h2","serif",{fontSize:"18px",fontWeight:"500",marginBottom:"4px"},["管理者認証"]));
   m.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginBottom:"16px"},["管理者パスワードを入力してください"]));
-  var pw=document.createElement("input");
-  pw.type="password";pw.placeholder="パスワード";
+  var pw=document.createElement("input");pw.type="password";pw.placeholder="パスワード";
   pw.style.cssText="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--bds);background:var(--s2);color:var(--tp);font-size:15px;box-sizing:border-box;margin-bottom:8px;outline:none;text-align:center;letter-spacing:4px;";
   m.appendChild(pw);
   var errMsg=h("p","",{fontSize:"12px",color:"var(--dc)",marginBottom:"12px",minHeight:"18px"},[""]);
   m.appendChild(errMsg);
-  var okBtn=mkBtn("確認",function(){
-    if(pw.value===ADMIN_PW){mr.innerHTML="";callback();}
-    else{errMsg.textContent="パスワードが違います";pw.value="";pw.focus();}
-  },"btn bp bw");
+  var okBtn=mkBtn("確認",function(){if(pw.value===ADMIN_PW){mr.innerHTML="";callback();}else{errMsg.textContent="パスワードが違います";pw.value="";pw.focus();}},"btn bp bw");
   m.appendChild(okBtn);
-  var canBtn=mkBtn("キャンセル",function(){mr.innerHTML="";},"btn bg bw");
-  canBtn.style.marginTop="8px";
-  m.appendChild(canBtn);
+  var canBtn=mkBtn("キャンセル",function(){mr.innerHTML="";},"btn bg bw");canBtn.style.marginTop="8px";m.appendChild(canBtn);
   pw.addEventListener("keydown",function(e){if(e.key==="Enter")okBtn.click();});
-  ov.appendChild(m);
-  mr.appendChild(ov);
+  ov.appendChild(m);mr.appendChild(ov);
   setTimeout(function(){pw.focus();},100);
 }
-function showSettings(){
-  var mr=document.getElementById("modal"); mr.innerHTML="";
-  var ov=h("div","movo");
-  var m=h("div","mov");
 
+/* ===== 설정 화면 ===== */
+function showSettings(){
+  var mr=document.getElementById("modal");mr.innerHTML="";
+  var ov=h("div","movo");var m=h("div","mov");
   var hdr=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"});
   hdr.appendChild(h("h2","serif",{fontSize:"18px",fontWeight:"500"},["API 設定"]));
   hdr.appendChild(mkBtn("✕",function(){mr.innerHTML="";},"btn bg"));
   m.appendChild(hdr);
-
-  m.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginBottom:"16px",lineHeight:"1.7"},["Claude AI による肌写真診断には Anthropic API キーが必要です。キーはこの端末のみに保存されます。"]));
-
+  m.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginBottom:"16px",lineHeight:"1.7"},["Claude AI による肌写真診断には Anthropic API キーが必要です。"]));
   var kw=h("div","fld");kw.appendChild(h("label","",{},["Anthropic API Key"]));
   var ki=document.createElement("input");ki.type="password";ki.placeholder="sk-ant-api03-...";ki.value=getKey();
   ki.style.cssText="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bds);background:var(--s2);color:var(--tp);font-size:14px;";
-  kw.appendChild(ki); m.appendChild(kw);
-
-  var lnk=h("p","",{fontSize:"12px",color:"var(--tm)",marginBottom:"16px"},["APIキーは "]);
-  var a=document.createElement("a");a.href="https://console.anthropic.com";a.target="_blank";a.textContent="console.anthropic.com";a.style.color="var(--p400)";
-  lnk.appendChild(a);lnk.appendChild(txt(" で取得できます。"));m.appendChild(lnk);
-
+  kw.appendChild(ki);m.appendChild(kw);
   m.appendChild(mkBtn("保存する",function(){setKey(ki.value.trim());mr.innerHTML="";alert("APIキーを保存しました。");},"btn bp bw"));
   m.appendChild(h("div","",{height:"1px",background:"var(--bd)",margin:"20px 0"}));
+  m.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"4px"},["使用状況"]));
+  var rem=PER_DEVICE_LIMIT-getCount();
+  m.appendChild(h("p","",{fontSize:"13px",color:"var(--ts)",marginBottom:"16px"},["この端末の残り診断回数: "+(rem<0?0:rem)+"回 / "+PER_DEVICE_LIMIT+"回"]));
+  m.appendChild(h("div","",{height:"1px",background:"var(--bd)",margin:"0 0 16px"}));
   m.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"8px"},["データ管理"]));
-
   m.appendChild(mkBtn("CSVエクスポート",function(){
     var rows=[["氏名","年齢","電話番号","肌タイプ","お悩み","メモ","最終診断日","登録日"]];
-    for(var i=0;i<customers.length;i++){
-      var c=customers[i];
-      rows.push([c.name,c.age||"",c.phone||"",c.skinType||"",(c.concerns||[]).join(" / "),c.memo||"",c.lastDiagnosis||"",c.createdAt||""]);
-    }
+    for(var i=0;i<customers.length;i++){var c=customers[i];rows.push([c.name,c.age||"",c.phone||"",c.skinType||"",(c.concerns||[]).join(" / "),c.memo||"",c.lastDiagnosis||"",c.createdAt||""]);}
     var csv="\uFEFF"+rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(",");}).join("\n");
-    var a2=document.createElement("a");a2.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a2.download="riman_karte_"+today()+".csv";a2.click();
+    var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="riman_karte_"+today()+".csv";a.click();
   },"btn bg bw"));
-
-  ov.appendChild(m);
-  ov.addEventListener("click",function(e){if(e.target===ov)mr.innerHTML="";});
-  mr.appendChild(ov);
+  ov.appendChild(m);ov.addEventListener("click",function(e){if(e.target===ov)mr.innerHTML="";});mr.appendChild(ov);
 }
 
-/* ===== HOME ===== */
+/* ===== 진단 버튼 클릭 시 체크 ===== */
+function startDiag(cId){
+  if(!getKey()){
+    alert("診断機能をご利用いただくにはAPIキーが必要です。管理者（"+ADMIN_EMAIL+"）にお問い合わせください。");
+    return;
+  }
+  if(isLimitReached()){showLimitScreen();return;}
+  S.diag=newDiag();
+  if(cId)S.diag.cId=cId;
+  S.diag.step=cId?1:0;
+  S.view="diagnosis";S.tab="diagnosis";
+  render();
+}
+
+/* ===== 네비게이션 ===== */
+function renderNav(){
+  var nav=document.getElementById("nav");nav.innerHTML="";
+  var tabs=[{id:"home",ic:"ti-home",l:"ホーム"},{id:"members",ic:"ti-users",l:"会員"},{id:"diagnosis",ic:"ti-camera",l:"診断"},{id:"products",ic:"ti-leaf",l:"商品"}];
+  for(var i=0;i<tabs.length;i++){
+    (function(tab){
+      var b=h("button","ntab"+(S.tab===tab.id?" on":""));
+      b.appendChild(ic(tab.ic));b.appendChild(h("span","",{},[tab.l]));
+      b.addEventListener("click",function(){
+        if(tab.id==="diagnosis"){startDiag(null);return;}
+        S.tab=tab.id;S.view=tab.id;render();
+      });
+      nav.appendChild(b);
+    })(tabs[i]);
+  }
+}
+
+function render(){renderNav();var c=document.getElementById("content");c.innerHTML="";({home:renderHome,members:renderMembers,detail:renderDetail,diagnosis:renderDiag,products:renderProducts}[S.view]||renderHome)(c);}
+
+/* ===== 홈 ===== */
 function renderHome(c){
   var sc=h("div","scr");
-
   var titleRow=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"24px"});
   var titleInfo=h("div");
   titleInfo.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)"},["RIMAN KOREA 肌カルテ管理"]));
   titleInfo.appendChild(h("h1","serif",{fontSize:"22px",fontWeight:"500",marginTop:"2px"},["ダッシュボード"]));
   titleRow.appendChild(titleInfo);
-  var adminIconBtn=document.createElement("button");
-  adminIconBtn.style.cssText="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tm);font-size:12px;cursor:pointer;padding:6px 10px;margin-top:4px;display:flex;align-items:center;gap:4px;";
-  adminIconBtn.innerHTML="&#9881; 管理者";
-  adminIconBtn.addEventListener("click",function(){checkAdmin(function(){showSettings();});});
-  titleRow.appendChild(adminIconBtn);
+  var adminBtn=document.createElement("button");
+  adminBtn.style.cssText="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tm);font-size:12px;cursor:pointer;padding:6px 10px;margin-top:4px;";
+  adminBtn.innerHTML="&#9881; 管理者";
+  adminBtn.addEventListener("click",function(){checkAdmin(function(){showSettings();});});
+  titleRow.appendChild(adminBtn);
   sc.appendChild(titleRow);
 
-  var sg=h("div","",{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"20px"});
-  var _rem=MAX_LIMIT-getCount();
+  /* 통계 3칸 */
+  var rem=PER_DEVICE_LIMIT-getCount();
   var stats=[
     {l:"登録会員",v:customers.length,ic:"ti-users"},
     {l:"診断済み",v:customers.filter(function(x){return (x.diagnoses||[]).length>0;}).length,ic:"ti-clipboard-check"},
-    {l:"残り診断回数",v:_rem<0?0:_rem,ic:"ti-refresh"}
+    {l:"残り診断回数",v:rem<0?0:rem,ic:"ti-refresh"}
   ];
+  var sg=h("div","g3",{marginBottom:"20px"});
   for(var si=0;si<stats.length;si++){
     (function(st){
-      var d=h("div","card",{textAlign:"center",padding:"16px 12px"});
-      d.appendChild(ic(st.ic,{fontSize:"22px",color:"var(--p400)",display:"block",marginBottom:"6px"}));
-      d.appendChild(h("div","",{fontSize:"28px",fontWeight:"500",color:"var(--p600)"},[String(st.v)]));
-      d.appendChild(h("div","",{fontSize:"12px",color:"var(--tm)",marginTop:"2px"},[st.l]));
+      var d=h("div","card",{textAlign:"center",padding:"14px 8px"});
+      d.appendChild(ic(st.ic,{fontSize:"20px",color:"var(--p400)",display:"block",marginBottom:"6px"}));
+      d.appendChild(h("div","",{fontSize:"24px",fontWeight:"500",color:"var(--p600)"},[String(st.v)]));
+      d.appendChild(h("div","",{fontSize:"11px",color:"var(--tm)",marginTop:"2px"},[st.l]));
       sg.appendChild(d);
     })(stats[si]);
   }
   sc.appendChild(sg);
 
+  /* 분포 */
   var stypes=["乾燥肌","普通肌","混合肌","脂性肌","敏感肌"];
   var dist=[];
-  for(var di=0;di<stypes.length;di++){
-    var cnt=0;for(var ci=0;ci<customers.length;ci++)if(customers[ci].skinType===stypes[di])cnt++;
-    if(cnt>0)dist.push({t:stypes[di],n:cnt});
-  }
+  for(var di=0;di<stypes.length;di++){var cnt=0;for(var ci=0;ci<customers.length;ci++)if(customers[ci].skinType===stypes[di])cnt++;if(cnt>0)dist.push({t:stypes[di],n:cnt});}
   if(dist.length>0){
     var box=h("div","card",{marginBottom:"20px"});
     box.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"12px"},["肌タイプ分布"]));
     for(var ddi=0;ddi<dist.length;ddi++){
       (function(d){
         var r=h("div","",{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"});
-        var pct=Math.round((d.n/customers.length)*100);
-        var tr=h("div","btr");tr.appendChild(h("div","bf",{width:pct+"%",background:"var(--p400)"}));
-        r.appendChild(h("div","",{width:"56px",fontSize:"12px",color:"var(--ts)"},[d.t]));
-        r.appendChild(tr);
+        var tr=h("div","btr");tr.appendChild(h("div","bf",{width:Math.round((d.n/customers.length)*100)+"%",background:"var(--p400)"}));
+        r.appendChild(h("div","",{width:"56px",fontSize:"12px",color:"var(--ts)"},[d.t]));r.appendChild(tr);
         r.appendChild(h("div","",{fontSize:"12px",fontWeight:"500",color:"var(--p400)",width:"20px",textAlign:"right"},[String(d.n)]));
         box.appendChild(r);
       })(dist[ddi]);
@@ -340,78 +261,54 @@ function renderHome(c){
     sc.appendChild(box);
   }
 
+  /* 최근 회원 */
   var sorted=customers.slice().sort(function(a,b){return (b.lastDiagnosis||"").localeCompare(a.lastDiagnosis||"");});
-  var recent=sorted.slice(0,3);
   var rh=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"});
   rh.appendChild(h("p","",{fontSize:"13px",fontWeight:"500"},["最近の会員"]));
   var ab=document.createElement("button");ab.style.cssText="background:none;border:none;color:var(--p400);font-size:12px;cursor:pointer;";ab.textContent="すべて見る →";
-  ab.addEventListener("click",function(){S.view="members";S.tab="members";render();});
-  rh.appendChild(ab);sc.appendChild(rh);
-
+  ab.addEventListener("click",function(){S.view="members";S.tab="members";render();});rh.appendChild(ab);sc.appendChild(rh);
+  var recent=sorted.slice(0,3);
   for(var ri=0;ri<recent.length;ri++){
     (function(cu){
-      var r=h("div","card cp");
-      r.addEventListener("click",function(){S.selId=cu.id;S.view="detail";S.tab="members";render();});
-      var inner=h("div","",{display:"flex",alignItems:"center",gap:"12px"});
-      inner.appendChild(av(cu.name,40));
+      var r=h("div","card cp");r.addEventListener("click",function(){S.selId=cu.id;S.view="detail";S.tab="members";render();});
+      var inner=h("div","",{display:"flex",alignItems:"center",gap:"12px"});inner.appendChild(av(cu.name,40));
       var inf=h("div","",{flex:"1",minWidth:"0"});
       inf.appendChild(h("div","",{fontSize:"14px",fontWeight:"500",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},[cu.name]));
       inf.appendChild(h("div","",{fontSize:"12px",color:"var(--tm)"},[cu.age+"歳"]));
-      inner.appendChild(inf);
-      if(cu.skinType)inner.appendChild(stag(cu.skinType));
-      r.appendChild(inner);sc.appendChild(r);
+      inner.appendChild(inf);if(cu.skinType)inner.appendChild(stag(cu.skinType));r.appendChild(inner);sc.appendChild(r);
     })(recent[ri]);
   }
-
-  sc.appendChild(h("div","",{marginTop:"16px"},[
-    mkBtn("＋ 新規カルテを作成",function(){if(!checkLimit())return;S.diag=newDiag();S.view="diagnosis";S.tab="diagnosis";render();},"btn bp bw")
-  ]));
-
+  sc.appendChild(h("div","",{marginTop:"16px"},[mkBtn("＋ 新規カルテを作成",function(){startDiag(null);},"btn bp bw")]));
   c.appendChild(sc);
 }
 
-/* ===== MEMBERS ===== */
+/* ===== 회원 ===== */
 function renderMembers(c){
   var search="",addMode=false,fm={name:"",age:"",phone:"",memo:""};
   var sc=h("div","scr");
   var hd=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"});
   hd.appendChild(h("h1","serif",{fontSize:"22px",fontWeight:"500"},["会員一覧"]));
-  hd.appendChild(mkBtn("＋ 新規",function(){addMode=!addMode;rfA();},"btn bg"));
-  sc.appendChild(hd);
-
+  hd.appendChild(mkBtn("＋ 新規",function(){addMode=!addMode;rfA();},"btn bg"));sc.appendChild(hd);
   var sw=h("div","",{position:"relative",marginBottom:"12px"});
   sw.appendChild(ic("ti-search",{position:"absolute",left:"11px",top:"50%",transform:"translateY(-50%)",color:"var(--tm)",fontSize:"16px",pointerEvents:"none"}));
-  var si=document.createElement("input");
-  si.placeholder="名前・電話番号で検索";
+  var si=document.createElement("input");si.placeholder="名前・電話番号で検索";
   si.style.cssText="width:100%;padding:10px 12px 10px 34px;border-radius:8px;border:1px solid var(--bds);background:var(--s2);color:var(--tp);font-size:13px;box-sizing:border-box;outline:none;";
-  si.addEventListener("input",function(e){search=e.target.value;rfL();});
-  sw.appendChild(si);sc.appendChild(sw);
-
-  var addBox=h("div"),listWrap=h("div");
-  sc.appendChild(addBox);sc.appendChild(listWrap);c.appendChild(sc);
-
+  si.addEventListener("input",function(e){search=e.target.value;rfL();});sw.appendChild(si);sc.appendChild(sw);
+  var addBox=h("div"),listWrap=h("div");sc.appendChild(addBox);sc.appendChild(listWrap);c.appendChild(sc);
   function rfA(){
-    addBox.innerHTML="";
-    if(!addMode)return;
+    addBox.innerHTML="";if(!addMode)return;
     var box=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",marginBottom:"12px"});
     box.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"12px",color:"var(--p800)"},["新規会員登録"]));
     box.appendChild(mkFld("お名前 *",fm.name,function(v){fm.name=v;},"text","田中 美代子"));
-    var rg=h("div","g2");
-    rg.appendChild(mkFld("年齢",fm.age,function(v){fm.age=v;},"number","45"));
-    rg.appendChild(mkFld("電話番号",fm.phone,function(v){fm.phone=v;},"tel","090-0000-0000"));
-    box.appendChild(rg);
+    var rg=h("div","g2");rg.appendChild(mkFld("年齢",fm.age,function(v){fm.age=v;},"number","45"));rg.appendChild(mkFld("電話番号",fm.phone,function(v){fm.phone=v;},"tel","090-0000-0000"));box.appendChild(rg);
     box.appendChild(mkFld("メモ（アレルギー等）",fm.memo,function(v){fm.memo=v;},"text","香料に敏感"));
-    box.appendChild(row([
-      mkBtn("登録する",function(){
-        if(!fm.name.trim())return;
-        customers.push({id:genId(),name:fm.name.trim(),age:parseInt(fm.age)||0,phone:fm.phone.trim(),memo:fm.memo.trim(),skinType:"",concerns:[],diagnoses:[],lastDiagnosis:"",createdAt:today()});
-        saveDB();fm={name:"",age:"",phone:"",memo:""};addMode=false;rfA();rfL();
-      },"btn bp bw"),
-      mkBtn("キャンセル",function(){addMode=false;rfA();},"btn bo bw")
-    ]));
+    box.appendChild(row([mkBtn("登録する",function(){
+      if(!fm.name.trim())return;
+      customers.push({id:genId(),name:fm.name.trim(),age:parseInt(fm.age)||0,phone:fm.phone.trim(),memo:fm.memo.trim(),skinType:"",concerns:[],diagnoses:[],lastDiagnosis:"",createdAt:today()});
+      saveDB();fm={name:"",age:"",phone:"",memo:""};addMode=false;rfA();rfL();
+    },"btn bp bw"),mkBtn("キャンセル",function(){addMode=false;rfA();},"btn bo bw")]));
     addBox.appendChild(box);
   }
-
   function rfL(){
     listWrap.innerHTML="";
     var fl=customers.filter(function(cu){return cu.name.indexOf(search)>=0||(cu.phone||"").indexOf(search)>=0;});
@@ -419,19 +316,15 @@ function renderMembers(c){
     if(!fl.length){listWrap.appendChild(h("div","",{textAlign:"center",padding:"36px 20px",color:"var(--tm)",fontSize:"14px"},["会員が見つかりません"]));return;}
     for(var i=0;i<fl.length;i++){
       (function(cu){
-        var r=h("div","card cp");
-        r.addEventListener("click",function(){S.selId=cu.id;S.view="detail";S.tab="members";render();});
-        var inner=h("div","",{display:"flex",alignItems:"center",gap:"12px"});
-        inner.appendChild(av(cu.name,44));
+        var r=h("div","card cp");r.addEventListener("click",function(){S.selId=cu.id;S.view="detail";S.tab="members";render();});
+        var inner=h("div","",{display:"flex",alignItems:"center",gap:"12px"});inner.appendChild(av(cu.name,44));
         var inf=h("div","",{flex:"1",minWidth:"0"});
         inf.appendChild(h("div","",{fontSize:"15px",fontWeight:"500"},[cu.name]));
         inf.appendChild(h("div","",{fontSize:"12px",color:"var(--tm)",marginTop:"1px"},[(cu.age?cu.age+"歳":"")+(cu.phone?" · "+cu.phone:"")]));
         var tgs=h("div","",{marginTop:"4px",display:"flex",flexWrap:"wrap",gap:"4px"});
         if(cu.skinType)tgs.appendChild(stag(cu.skinType));
-        var conc=cu.concerns||[];
-        for(var j=0;j<Math.min(2,conc.length);j++)tgs.appendChild(h("span","tag",{background:"var(--s1)",color:"var(--tm)",border:"0.5px solid var(--bd)"},[conc[j]]));
-        inf.appendChild(tgs);inner.appendChild(inf);
-        inner.appendChild(ic("ti-chevron-right",{color:"var(--tm)",fontSize:"16px"}));
+        var conc=cu.concerns||[];for(var j=0;j<Math.min(2,conc.length);j++)tgs.appendChild(h("span","tag",{background:"var(--s1)",color:"var(--tm)",border:"0.5px solid var(--bd)"},[conc[j]]));
+        inf.appendChild(tgs);inner.appendChild(inf);inner.appendChild(ic("ti-chevron-right",{color:"var(--tm)",fontSize:"16px"}));
         r.appendChild(inner);listWrap.appendChild(r);
       })(fl[i]);
     }
@@ -439,13 +332,11 @@ function renderMembers(c){
   rfA();rfL();
 }
 
-/* ===== DETAIL ===== */
+/* ===== 상세 ===== */
 function renderDetail(c){
-  var cu=null;
-  for(var i=0;i<customers.length;i++)if(customers[i].id===S.selId){cu=customers[i];break;}
+  var cu=null;for(var i=0;i<customers.length;i++)if(customers[i].id===S.selId){cu=customers[i];break;}
   if(!cu){S.view="members";render();return;}
-  var editing=false;
-  var fm={name:cu.name,age:String(cu.age||""),phone:cu.phone||"",memo:cu.memo||""};
+  var editing=false;var fm={name:cu.name,age:String(cu.age||""),phone:cu.phone||"",memo:cu.memo||""};
   var sc=h("div","scr");
   var top=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"});
   top.appendChild(mkBtn("← 戻る",function(){S.view="members";render();},"btn bg"));
@@ -453,472 +344,233 @@ function renderDetail(c){
   eb.addEventListener("click",function(){editing=!editing;eb.textContent=editing?"キャンセル":"編集";rfM();});
   top.appendChild(eb);sc.appendChild(top);
   var main=h("div");sc.appendChild(main);c.appendChild(sc);
-
   function rfM(){
     main.innerHTML="";
     var pb=h("div","card",{background:"linear-gradient(135deg,var(--p50),#FDF9FB)",border:"1px solid var(--p100)",marginBottom:"12px"});
-    var pi=h("div","",{display:"flex",alignItems:"flex-start",gap:"14px"});
-    pi.appendChild(av(cu.name,56));
+    var pi=h("div","",{display:"flex",alignItems:"flex-start",gap:"14px"});pi.appendChild(av(cu.name,56));
     if(editing){
-      var ef=h("div","",{flex:"1"});
-      ef.appendChild(mkFld("お名前",fm.name,function(v){fm.name=v;}));
-      var rg=h("div","g2");
-      rg.appendChild(mkFld("年齢",fm.age,function(v){fm.age=v;},"number"));
-      rg.appendChild(mkFld("電話番号",fm.phone,function(v){fm.phone=v;},"tel"));
-      ef.appendChild(rg);
+      var ef=h("div","",{flex:"1"});ef.appendChild(mkFld("お名前",fm.name,function(v){fm.name=v;}));
+      var rg=h("div","g2");rg.appendChild(mkFld("年齢",fm.age,function(v){fm.age=v;},"number"));rg.appendChild(mkFld("電話番号",fm.phone,function(v){fm.phone=v;},"tel"));ef.appendChild(rg);
       ef.appendChild(mkFld("メモ",fm.memo,function(v){fm.memo=v;}));
       ef.appendChild(mkBtn("保存する",function(){
-        for(var i=0;i<customers.length;i++){
-          if(customers[i].id===cu.id){
-            customers[i].name=fm.name;customers[i].age=parseInt(fm.age)||0;
-            customers[i].phone=fm.phone;customers[i].memo=fm.memo;
-            cu=customers[i];break;
-          }
-        }
+        for(var i=0;i<customers.length;i++){if(customers[i].id===cu.id){customers[i].name=fm.name;customers[i].age=parseInt(fm.age)||0;customers[i].phone=fm.phone;customers[i].memo=fm.memo;cu=customers[i];break;}}
         saveDB();editing=false;eb.textContent="編集";rfM();
-      },"btn bp bw"));
-      pi.appendChild(ef);
+      },"btn bp bw"));pi.appendChild(ef);
     }else{
-      var inf=h("div","",{flex:"1"});
-      inf.appendChild(h("h2","",{fontSize:"20px",fontWeight:"500"},[cu.name]));
+      var inf=h("div","",{flex:"1"});inf.appendChild(h("h2","",{fontSize:"20px",fontWeight:"500"},[cu.name]));
       inf.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginTop:"4px"},[(cu.age?cu.age+"歳":"")+(cu.phone?" · "+cu.phone:"")]));
       if(cu.memo)inf.appendChild(h("div","tag",{background:"var(--wbg)",color:"var(--wc)",marginTop:"8px"},["⚠ "+cu.memo]));
       pi.appendChild(inf);
     }
     pb.appendChild(pi);main.appendChild(pb);
-
     if(cu.skinType){
-      var sp=h("div","card",{marginBottom:"12px"});
-      sp.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",fontWeight:"500",marginBottom:"8px"},["肌プロフィール"]));
-      var tgs=h("div","",{display:"flex",flexWrap:"wrap",gap:"6px"});
-      tgs.appendChild(stag(cu.skinType));
-      var conc=cu.concerns||[];
-      for(var ci=0;ci<conc.length;ci++)tgs.appendChild(h("span","tag",{background:"var(--p50)",color:"var(--p600)"},[conc[ci]]));
+      var sp=h("div","card",{marginBottom:"12px"});sp.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",fontWeight:"500",marginBottom:"8px"},["肌プロフィール"]));
+      var tgs=h("div","",{display:"flex",flexWrap:"wrap",gap:"6px"});tgs.appendChild(stag(cu.skinType));
+      var conc=cu.concerns||[];for(var ci=0;ci<conc.length;ci++)tgs.appendChild(h("span","tag",{background:"var(--p50)",color:"var(--p600)"},[conc[ci]]));
       sp.appendChild(tgs);main.appendChild(sp);
     }
-
     main.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"8px"},["カルテ履歴 ("+(cu.diagnoses||[]).length+"件)"]));
     var diags=cu.diagnoses||[];
-    if(!diags.length){
-      main.appendChild(h("div","card",{textAlign:"center",padding:"20px",color:"var(--tm)",fontSize:"13px",marginBottom:"12px"},["まだ診断履歴がありません"]));
-    }else{
+    if(!diags.length){main.appendChild(h("div","card",{textAlign:"center",padding:"20px",color:"var(--tm)",fontSize:"13px",marginBottom:"12px"},["まだ診断履歴がありません"]));}
+    else{
       for(var di=diags.length-1;di>=0;di--){
         (function(d){
           var db=h("div","card",{marginBottom:"8px"});
           var dt=h("div","",{display:"flex",justifyContent:"space-between",marginBottom:"8px",alignItems:"center"});
-          dt.appendChild(h("span","",{fontSize:"12px",color:"var(--tm)"},[d.date]));
-          if(d.skinType)dt.appendChild(stag(d.skinType));
-          db.appendChild(dt);
+          dt.appendChild(h("span","",{fontSize:"12px",color:"var(--tm)"},[d.date]));if(d.skinType)dt.appendChild(stag(d.skinType));db.appendChild(dt);
           if(d.skinDiagnosis)db.appendChild(h("p","",{fontSize:"13px",lineHeight:"1.6",marginBottom:"6px"},[d.skinDiagnosis]));
-          if(d.urgencyLevel){
-            var uc={高:{bg:"var(--dbg)",c:"var(--dc)"},中:{bg:"var(--wbg)",c:"var(--wc)"},低:{bg:"var(--sbg)",c:"var(--sc)"}}[d.urgencyLevel]||{bg:"var(--p50)",c:"var(--p600)"};
-            db.appendChild(h("span","tag",{background:uc.bg,color:uc.c,display:"inline-block",marginBottom:"6px"},["優先度: "+d.urgencyLevel]));
-          }
-          var adv=d.advice||[];
-          for(var ai=0;ai<Math.min(2,adv.length);ai++){
-            var rw=h("div","",{display:"flex",gap:"6px",fontSize:"12px",color:"var(--ts)",lineHeight:"1.6",marginBottom:"4px"});
-            rw.appendChild(h("span","",{color:"var(--p400)",flexShrink:"0"},["✦"]));
-            rw.appendChild(txt(adv[ai]));
-            db.appendChild(rw);
-          }
-          var pc=d.productCategories||[];
-          if(pc.length)db.appendChild(h("p","",{fontSize:"11px",color:"var(--p600)",marginTop:"8px",fontWeight:"500"},["おすすめ: "+pc.join(" · ")]));
+          if(d.urgencyLevel){var uc={高:{bg:"var(--dbg)",c:"var(--dc)"},中:{bg:"var(--wbg)",c:"var(--wc)"},低:{bg:"var(--sbg)",c:"var(--sc)"}}[d.urgencyLevel]||{bg:"var(--p50)",c:"var(--p600)"};db.appendChild(h("span","tag",{background:uc.bg,color:uc.c,display:"inline-block",marginBottom:"6px"},["優先度: "+d.urgencyLevel]));}
+          var adv=d.advice||[];for(var ai=0;ai<Math.min(2,adv.length);ai++){var rw=h("div","",{display:"flex",gap:"6px",fontSize:"12px",color:"var(--ts)",lineHeight:"1.6",marginBottom:"4px"});rw.appendChild(h("span","",{color:"var(--p400)",flexShrink:"0"},["✦"]));rw.appendChild(txt(adv[ai]));db.appendChild(rw);}
+          var pc=d.productCategories||[];if(pc.length)db.appendChild(h("p","",{fontSize:"11px",color:"var(--p600)",marginTop:"8px",fontWeight:"500"},["おすすめ: "+pc.join(" · ")]));
           main.appendChild(db);
         })(diags[di]);
       }
     }
-
     var acts=h("div","",{display:"flex",flexDirection:"column",gap:"8px",marginTop:"4px"});
-    acts.appendChild(mkBtn("肌写真診断を行う",function(){
-      S.diag=newDiag();S.diag.cId=cu.id;S.diag.step=1;
-      S.view="diagnosis";S.tab="diagnosis";render();
-    },"btn bp bw"));
-    acts.appendChild(mkBtn("会員を削除",function(){
-      if(confirm(cu.name+" 様を削除しますか？")){
-        customers=customers.filter(function(x){return x.id!==cu.id;});
-        saveDB();S.view="members";S.tab="members";render();
-      }
-    },"btn bd2 bw"));
+    acts.appendChild(mkBtn("肌写真診断を行う",function(){startDiag(cu.id);},"btn bp bw"));
+    acts.appendChild(mkBtn("会員を削除",function(){if(confirm(cu.name+" 様を削除しますか？")){customers=customers.filter(function(x){return x.id!==cu.id;});saveDB();S.view="members";S.tab="members";render();}},"btn bd2 bw"));
     main.appendChild(acts);
   }
   rfM();
 }
 
-/* ===== DIAGNOSIS ===== */
+/* ===== 진단 ===== */
 function renderDiag(c){
   var d=S.diag;
   var sc=h("div","scr");
-
-  /* ヘッダー */
   var top=h("div","",{display:"flex",alignItems:"center",gap:"8px",marginBottom:"16px"});
-  var bb=document.createElement("button");
-  bb.style.cssText="background:none;border:none;color:var(--p400);cursor:pointer;padding:4px;display:flex;align-items:center;";
+  var bb=document.createElement("button");bb.style.cssText="background:none;border:none;color:var(--p400);cursor:pointer;padding:4px;display:flex;align-items:center;";
   bb.appendChild(ic("ti-arrow-left",{fontSize:"20px"}));
-  bb.addEventListener("click",function(){
-    if(d.step===0){S.view="home";S.tab="home";render();return;}
-    if(d.step===4){d.step=2;d.result=null;}
-    else d.step=Math.max(0,d.step-1);
-    rfD();
-  });
+  bb.addEventListener("click",function(){if(d.step===0||d.step===1&&!d.cId){S.view="home";S.tab="home";render();return;}if(d.step===4){d.step=2;d.result=null;}else d.step=Math.max(0,d.step-1);rfD();});
   top.appendChild(bb);
-
-  var stepLabel=d.step<4?"STEP "+(d.step+1)+" / 3":"診断完了";
-  var stepTitle=d.step<4?"肌写真診断":"診断結果";
   var hinfo=h("div");
-  hinfo.appendChild(h("p","",{margin:"0",fontSize:"12px",color:"var(--tm)"},[stepLabel]));
-  hinfo.appendChild(h("h1","serif",{margin:"2px 0 0",fontSize:"18px",fontWeight:"500"},[stepTitle]));
-  top.appendChild(hinfo);
-  sc.appendChild(top);
-
-  /* ステップドット */
-  var dotsEl=h("div","sdots");
-  for(var di=0;di<3;di++){
-    dotsEl.appendChild(h("div","sdot",{flex:di===d.step?"2":"1",background:di<=d.step?"var(--p400)":"var(--bds)"}));
-  }
-
+  hinfo.appendChild(h("p","",{margin:"0",fontSize:"12px",color:"var(--tm)"},[d.step<4?"STEP "+(d.step+1)+" / 3":"診断完了"]));
+  hinfo.appendChild(h("h1","serif",{margin:"2px 0 0",fontSize:"18px",fontWeight:"500"},[d.step<4?"肌写真診断":"診断結果"]));
+  top.appendChild(hinfo);sc.appendChild(top);
+  var dotsEl=h("div","sdots");for(var di=0;di<3;di++)dotsEl.appendChild(h("div","sdot",{flex:di===d.step?"2":"1",background:di<=d.step?"var(--p400)":"var(--bds)"}));
   var main=h("div");sc.appendChild(main);c.appendChild(sc);
 
   function rfD(){
     main.innerHTML="";
     if(d.step<4)main.appendChild(dotsEl);
-    if(d.step===0)rfS0();
-    else if(d.step===1)rfS1();
-    else if(d.step===2)rfS2();
-    else if(d.step===4)rfResult();
+    if(d.step===0)rfS0();else if(d.step===1)rfS1();else if(d.step===2)rfS2();else if(d.step===4)rfResult();
   }
 
-  /* --- STEP 0: 会員選択 --- */
   function rfS0(){
     main.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",marginBottom:"12px"},["診断対象の会員を選んでください"]));
-
-    var tabRow=row([
-      mkBtn("既存会員",function(){d.isNew=false;rfD();},"btn "+(d.isNew?"bo":"bp")),
-      mkBtn("新規会員",function(){d.isNew=true;rfD();},"btn "+(d.isNew?"bp":"bo"))
-    ]);
-    tabRow.style.marginBottom="16px";
-    main.appendChild(tabRow);
-
-    /* 次へボタンを先に作り参照保持 */
+    var tabRow=row([mkBtn("既存会員",function(){d.isNew=false;rfD();},"btn "+(d.isNew?"bo":"bp")),mkBtn("新規会員",function(){d.isNew=true;rfD();},"btn "+(d.isNew?"bp":"bo"))]);
+    tabRow.style.marginBottom="16px";main.appendChild(tabRow);
     var nextDiv=h("div","",{marginTop:"16px"});
     var dis=d.isNew?!d.newC.name.trim():!d.cId;
     var nextB=mkBtn("次へ →",function(){d.step=1;rfD();},"btn bp bw",dis);
-
     if(d.isNew){
       var box=h("div","card");
       var nf=mkFld("お名前 *",d.newC.name,function(v){d.newC.name=v;nextB.disabled=!v.trim();},"text","田中 美代子");
-      var rg=h("div","g2");
-      rg.appendChild(mkFld("年齢",d.newC.age,function(v){d.newC.age=v;},"number","45"));
-      rg.appendChild(mkFld("電話番号",d.newC.phone,function(v){d.newC.phone=v;},"tel","090-..."));
-      box.appendChild(nf);box.appendChild(rg);
-      main.appendChild(box);
+      var rg=h("div","g2");rg.appendChild(mkFld("年齢",d.newC.age,function(v){d.newC.age=v;},"number","45"));rg.appendChild(mkFld("電話番号",d.newC.phone,function(v){d.newC.phone=v;},"tel","090-..."));
+      box.appendChild(nf);box.appendChild(rg);main.appendChild(box);
     }else{
       for(var i=0;i<customers.length;i++){
         (function(cu){
           var sel=d.cId===cu.id;
           var r=h("div","card cp",sel?{border:"2px solid var(--p400)",background:"var(--p50)"}:{});
-          r.addEventListener("click",function(){d.cId=cu.id;rfD();});
-          var inner=h("div","",{display:"flex",alignItems:"center",gap:"10px"});
-          inner.appendChild(av(cu.name,36));
-          var inf=h("div","",{flex:"1"});
-          inf.appendChild(h("div","",{fontSize:"14px",fontWeight:"500"},[cu.name]));
-          inf.appendChild(h("div","",{fontSize:"12px",color:"var(--tm)"},[cu.age+"歳 · "+(cu.skinType||"未診断")]));
-          inner.appendChild(inf);
-          if(sel)inner.appendChild(ic("ti-check",{color:"var(--p400)",fontSize:"18px"}));
-          r.appendChild(inner);main.appendChild(r);
+          r.addEventListener("click",function(){d.cId=cu.id;nextB.disabled=false;rfD();});
+          var inner=h("div","",{display:"flex",alignItems:"center",gap:"10px"});inner.appendChild(av(cu.name,36));
+          var inf=h("div","",{flex:"1"});inf.appendChild(h("div","",{fontSize:"14px",fontWeight:"500"},[cu.name]));inf.appendChild(h("div","",{fontSize:"12px",color:"var(--tm)"},[cu.age+"歳 · "+(cu.skinType||"未診断")]));inner.appendChild(inf);
+          if(sel)inner.appendChild(ic("ti-check",{color:"var(--p400)",fontSize:"18px"}));r.appendChild(inner);main.appendChild(r);
         })(customers[i]);
       }
     }
-    nextDiv.appendChild(nextB);
-    main.appendChild(nextDiv);
+    nextDiv.appendChild(nextB);main.appendChild(nextDiv);
   }
 
-  /* --- STEP 1: 写真撮影 ---
-     capture="user" → スマホではフロントカメラが直接起動（HTTPS不要）
-     capture属性なし → ギャラリーから選択 */
   function rfS1(){
     main.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",marginBottom:"4px"},["顔写真を撮影してください"]));
     main.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginBottom:"16px"},["正面から明るい場所で撮影するとより正確に診断できます"]));
-
     if(d.photo){
-      /* 撮影済みプレビュー */
       var img=document.createElement("img");img.src=d.photo;img.className="prev-img";main.appendChild(img);
       main.appendChild(h("p","",{fontSize:"12px",color:"var(--tm)",textAlign:"center",marginBottom:"14px"},["この写真でよろしければ「次へ」を押してください"]));
-      main.appendChild(row([
-        mkBtn("撮り直す",function(){d.photo=null;rfD();},"btn bo bw"),
-        mkBtn("次へ →",function(){d.step=2;rfD();},"btn bp bw")
-      ]));
+      main.appendChild(row([mkBtn("撮り直す",function(){d.photo=null;rfD();},"btn bo bw"),mkBtn("次へ →",function(){d.step=2;rfD();},"btn bp bw")]));
     }else{
-      /* カメライラスト */
       var illust=h("div","",{textAlign:"center",padding:"36px 0 28px",background:"var(--s1)",borderRadius:"14px",marginBottom:"20px",border:"1px dashed var(--bds)"});
       illust.appendChild(ic("ti-camera",{fontSize:"64px",color:"var(--p200)",display:"block",margin:"0 auto 12px"}));
       illust.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)"},["お顔を正面に向けて撮影してください"]));
       illust.appendChild(h("p","",{fontSize:"11px",color:"var(--p200)",marginTop:"6px"},["明るい場所・すっぴんまたは薄化粧が理想的です"]));
       main.appendChild(illust);
-
-      /* input①: capture="user" でフロントカメラを直接起動 */
-      var camInput=document.createElement("input");
-      camInput.type="file";camInput.accept="image/*";camInput.capture="user";camInput.style.display="none";
-      camInput.addEventListener("change",function(e){
-        var f=e.target.files[0];if(!f)return;
-        var reader=new FileReader();
-        reader.onload=function(ev){d.photo=ev.target.result;rfD();};
-        reader.readAsDataURL(f);
-      });
+      var camInput=document.createElement("input");camInput.type="file";camInput.accept="image/*";camInput.capture="user";camInput.style.display="none";
+      camInput.addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){d.photo=ev.target.result;rfD();};r.readAsDataURL(f);});
       main.appendChild(camInput);
-
-      /* input②: ギャラリー選択（captureなし） */
-      var galInput=document.createElement("input");
-      galInput.type="file";galInput.accept="image/*";galInput.style.display="none";
-      galInput.addEventListener("change",function(e){
-        var f=e.target.files[0];if(!f)return;
-        var reader=new FileReader();
-        reader.onload=function(ev){d.photo=ev.target.result;rfD();};
-        reader.readAsDataURL(f);
-      });
+      var galInput=document.createElement("input");galInput.type="file";galInput.accept="image/*";galInput.style.display="none";
+      galInput.addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){d.photo=ev.target.result;rfD();};r.readAsDataURL(f);});
       main.appendChild(galInput);
-
-      /* メインボタン */
       main.appendChild(mkBtn("📷  カメラで撮影する",function(){camInput.click();},"btn bp bw"));
-
-      /* 区切り */
       var dv=h("div","",{display:"flex",alignItems:"center",gap:"10px",margin:"14px 0"});
-      dv.appendChild(h("div","",{flex:"1",height:"1px",background:"var(--bd)"}));
-      dv.appendChild(h("span","",{fontSize:"12px",color:"var(--tm)"},["または"]));
-      dv.appendChild(h("div","",{flex:"1",height:"1px",background:"var(--bd)"}));
-      main.appendChild(dv);
-
+      dv.appendChild(h("div","",{flex:"1",height:"1px",background:"var(--bd)"}));dv.appendChild(h("span","",{fontSize:"12px",color:"var(--tm)"},["または"]));dv.appendChild(h("div","",{flex:"1",height:"1px",background:"var(--bd)"}));main.appendChild(dv);
       main.appendChild(mkBtn("🖼  ギャラリーから選ぶ",function(){galInput.click();},"btn bg bw"));
-
       main.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",textAlign:"center",marginTop:"14px",lineHeight:"1.8"},["📱 スマホ → カメラが直接起動します\n💻 PC → ファイル選択画面が開きます"]));
     }
   }
 
-  /* --- STEP 2: 生活習慣 --- */
   function rfS2(){
     main.appendChild(h("p","",{fontSize:"15px",fontWeight:"500",marginBottom:"4px"},["生活習慣を教えてください"]));
     main.appendChild(h("p","",{fontSize:"13px",color:"var(--tm)",marginBottom:"14px"},["写真と合わせてより正確に診断します"]));
-
     if(d.photo){
       var thumb=h("div","",{display:"flex",alignItems:"center",gap:"10px",padding:"10px 12px",background:"var(--p50)",borderRadius:"10px",marginBottom:"16px",border:"1px solid var(--p100)"});
       var timg=document.createElement("img");timg.src=d.photo;timg.style.cssText="width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;";
-      thumb.appendChild(timg);
-      thumb.appendChild(h("div","",{fontSize:"13px",color:"var(--p600)"},["✓ 写真を撮影済み — AIが肌状態を分析します"]));
-      main.appendChild(thumb);
+      thumb.appendChild(timg);thumb.appendChild(h("div","",{fontSize:"13px",color:"var(--p600)"},["✓ 写真を撮影済み — AIが肌状態を分析します"]));main.appendChild(thumb);
     }
-
-    var lsOpts=[
-      {key:"sleep",label:"😴 睡眠の質",opts:["よく眠れている","やや不足","かなり不足"]},
-      {key:"water",label:"💧 水分摂取量",opts:["2L以上","1〜2L程度","1L未満"]},
-      {key:"uv",label:"☀️ 紫外線対策",opts:["毎日使用","外出時のみ","ほとんどしない"]}
-    ];
+    var lsOpts=[{key:"sleep",label:"😴 睡眠の質",opts:["よく眠れている","やや不足","かなり不足"]},{key:"water",label:"💧 水分摂取量",opts:["2L以上","1〜2L程度","1L未満"]},{key:"uv",label:"☀️ 紫外線対策",opts:["毎日使用","外出時のみ","ほとんどしない"]}];
     for(var li=0;li<lsOpts.length;li++){
       (function(opt){
-        var w=h("div","",{marginBottom:"14px"});
-        w.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"6px"},[opt.label]));
+        var w=h("div","",{marginBottom:"14px"});w.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",marginBottom:"6px"},[opt.label]));
         var r=h("div","",{display:"flex",gap:"6px"});
-        for(var oi=0;oi<opt.opts.length;oi++){
-          (function(o){
-            var b=h("div","lsb"+(d.ls[opt.key]===o?" on":""),{},[o]);
-            b.addEventListener("click",function(){d.ls[opt.key]=o;rfD();});
-            r.appendChild(b);
-          })(opt.opts[oi]);
-        }
+        for(var oi=0;oi<opt.opts.length;oi++){(function(o){var b=h("div","lsb"+(d.ls[opt.key]===o?" on":""),{},[o]);b.addEventListener("click",function(){d.ls[opt.key]=o;rfD();});r.appendChild(b);})(opt.opts[oi]);}
         w.appendChild(r);main.appendChild(w);
       })(lsOpts[li]);
     }
-
-    var nw=h("div","fld");
-    nw.appendChild(h("label","",{},["その他メモ（アレルギー・使用中の商品など）"]));
-    var ta=document.createElement("textarea");
-    ta.placeholder="例: 花粉症あり、現在○○シリーズを使用中";ta.value=d.note;
+    var nw=h("div","fld");nw.appendChild(h("label","",{},["その他メモ（アレルギー・使用中の商品など）"]));
+    var ta=document.createElement("textarea");ta.placeholder="例: 花粉症あり、現在○○シリーズを使用中";ta.value=d.note;
     ta.style.cssText="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bds);background:var(--s2);color:var(--tp);font-size:13px;box-sizing:border-box;resize:vertical;min-height:62px;outline:none;display:block;";
-    ta.addEventListener("input",function(e){d.note=e.target.value;});
-    nw.appendChild(ta);main.appendChild(nw);
-
+    ta.addEventListener("input",function(e){d.note=e.target.value;});nw.appendChild(ta);main.appendChild(nw);
     if(d.error)main.appendChild(h("div","",{background:"var(--dbg)",color:"var(--dc)",padding:"12px 14px",borderRadius:"10px",fontSize:"13px",lineHeight:"1.6",marginBottom:"12px"},[d.error]));
-
     var canRun=d.photo&&d.ls.sleep&&d.ls.water&&d.ls.uv&&!d.loading;
     main.appendChild(mkBtn(d.loading?"✨ AI診断中...":"顔写真をAI診断する →",function(){
-      var key=getKey();
-      if(!key){if(confirm("APIキーが未設定です。設定画面を開きますか？")){showSettings();}return;}
+      var key=getKey();if(!key){alert("APIキーが未設定です。管理者にお問い合わせください。");return;}
       d.loading=true;d.error="";rfD();
-      var cu=null;
-      if(d.isNew){cu={name:d.newC.name,age:d.newC.age};}
-      else{for(var i=0;i<customers.length;i++)if(customers[i].id===d.cId){cu=customers[i];break;}}
+      var cu=null;if(d.isNew){cu={name:d.newC.name,age:d.newC.age};}else{for(var i=0;i<customers.length;i++)if(customers[i].id===d.cId){cu=customers[i];break;}}
       if(!cu)cu={name:"",age:""};
-      var base64=d.photo.split(",")[1];
-      var mediaType=d.photo.indexOf("data:image/png")===0?"image/png":"image/jpeg";
-      var prompt="あなたは経験豊富な美容専門家です。この顔写真から肌状態を詳しく分析してください。\n\nお客様情報:\n- 名前: "+cu.name+"\n- 年齢: "+(cu.age||"不明")+"歳代\n- 睡眠の質: "+d.ls.sleep+"\n- 水分摂取: "+d.ls.water+"\n- 紫外線対策: "+d.ls.uv+"\n- 備考: "+(d.note||"なし")+"\n\n写真から以下を分析し、JSONのみで回答してください（説明文・コードブロック記号は不要）:\n\n{\"skinType\":\"乾燥肌/普通肌/混合肌/脂性肌/敏感肌のいずれか1つ\",\"skinDiagnosis\":\"写真から見た肌の総合診断（60字以内）\",\"concerns\":[\"写真から判断したお悩み1\",\"お悩み2\",\"お悩み3\"],\"skinCondition\":{\"hydration\":保水力1から10,\"elasticity\":弾力1から10,\"sensitivity\":敏感度1から10,\"brightness\":透明感1から10},\"advice\":[\"スキンケアアドバイス1\",\"アドバイス2\",\"アドバイス3\",\"アドバイス4\"],\"productCategories\":[\"RIMANおすすめカテゴリ1\",\"カテゴリ2\",\"カテゴリ3\"],\"urgencyLevel\":\"高または中または低\"}";
-
-      if(!checkLimit())return;
-      var newCount=addCount();
-      if(newCount===WARN_LIMIT){setTimeout(function(){showWarnPopup(newCount);},1500);}
-
-      fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
+      var base64=d.photo.split(",")[1];var mediaType=d.photo.indexOf("data:image/png")===0?"image/png":"image/jpeg";
+      var prompt="あなたは経験豊富な美容専門家です。この顔写真から肌状態を詳しく分析してください。\n\nお客様情報:\n- 名前: "+cu.name+"\n- 年齢: "+(cu.age||"不明")+"歳代\n- 睡眠の質: "+d.ls.sleep+"\n- 水分摂取: "+d.ls.water+"\n- 紫外線対策: "+d.ls.uv+"\n- 備考: "+(d.note||"なし")+"\n\n写真から以下を分析し、JSONのみで回答してください（説明文・コードブロック記号は不要）:\n{\"skinType\":\"乾燥肌/普通肌/混合肌/脂性肌/敏感肌のいずれか1つ\",\"skinDiagnosis\":\"写真から見た肌の総合診断（60字以内）\",\"concerns\":[\"写真から判断したお悩み1\",\"お悩み2\",\"お悩み3\"],\"skinCondition\":{\"hydration\":保水力1から10,\"elasticity\":弾力1から10,\"sensitivity\":敏感度1から10,\"brightness\":透明感1から10},\"advice\":[\"スキンケアアドバイス1\",\"アドバイス2\",\"アドバイス3\",\"アドバイス4\"],\"productCategories\":[\"RIMANおすすめカテゴリ1\",\"カテゴリ2\",\"カテゴリ3\"],\"urgencyLevel\":\"高または中または低\"}";
+      fetch("https://api.anthropic.com/v1/messages",{method:"POST",
         headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-6",max_tokens:1200,
-          messages:[{role:"user",content:[
-            {type:"image",source:{type:"base64",media_type:mediaType,data:base64}},
-            {type:"text",text:prompt}
-          ]}]
-        })
-      }).then(function(res){return res.json();}).then(function(data){
+        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1200,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:prompt}]}]})
+      }).then(function(r){return r.json();}).then(function(data){
         if(data.error)throw new Error(data.error.message||"APIエラー");
-        var content=data.content||[];
-        var txt2="";
-        for(var i=0;i<content.length;i++)if(content[i].type==="text"){txt2=content[i].text;break;}
+        var content=data.content||[];var txt2="";for(var i=0;i<content.length;i++)if(content[i].type==="text"){txt2=content[i].text;break;}
         d.result=JSON.parse(txt2.replace(/```json|```/g,"").trim());
+        /* 사용 횟수 카운트 */
+        var newCount=addCount();
         d.step=4;d.loading=false;rfD();
-      }).catch(function(e){
-        d.error="診断エラー: "+(e.message||"再度お試しください");
-        d.loading=false;rfD();
-      });
+        /* 5회 도달 시 다음에 제한 화면 표시 예고 */
+        if(newCount>=PER_DEVICE_LIMIT){setTimeout(function(){showLimitScreen();},3000);}
+      }).catch(function(e){d.error="診断エラー: "+(e.message||"再度お試しください");d.loading=false;rfD();});
     },"btn bp bw",!canRun));
-
     if(d.loading)main.appendChild(h("p","",{textAlign:"center",color:"var(--tm)",fontSize:"13px",marginTop:"12px"},["顔写真をAIが分析しています..."]));
   }
 
-  /* --- STEP 4: 診断結果 --- */
   function rfResult(){
     var r=d.result;if(!r)return;
-    var cu=null;
-    if(d.isNew)cu={name:d.newC.name};
-    else{for(var i=0;i<customers.length;i++)if(customers[i].id===d.cId){cu=customers[i];break;}}
+    var cu=null;if(d.isNew)cu={name:d.newC.name};else{for(var i=0;i<customers.length;i++)if(customers[i].id===d.cId){cu=customers[i];break;}}
     if(!cu)cu={name:""};
+    var rem2=PER_DEVICE_LIMIT-getCount();
+    main.appendChild(h("div","",{textAlign:"center",marginBottom:"20px"},[h("div","",{fontSize:"32px",marginBottom:"4px"},["✨"]),h("p","",{fontSize:"13px",color:"var(--tm)"},[cu.name+" 様の肌診断結果"])]));
+    if(rem2>=0){main.appendChild(h("div","",{background:"var(--p50)",border:"1px solid var(--p100)",borderRadius:"10px",padding:"8px 14px",marginBottom:"12px",fontSize:"12px",color:"var(--p600)",textAlign:"center"},["残り診断回数: "+rem2+"回"+(rem2===0?" （本日で無料体験終了）":"")]));}
 
-    main.appendChild(h("div","",{textAlign:"center",marginBottom:"20px"},[
-      h("div","",{fontSize:"32px",marginBottom:"4px"},["✨"]),
-      h("p","",{fontSize:"13px",color:"var(--tm)"},[cu.name+" 様の肌診断結果"])
-    ]));
-
-    /* 診断サマリー */
     var sb=h("div","card",{background:"linear-gradient(135deg,var(--p50),#FDF9FB)",border:"1px solid var(--p100)",marginBottom:"12px"});
     if(d.photo){
       var pi=h("div","",{display:"flex",gap:"14px",alignItems:"flex-start"});
       var pimg=document.createElement("img");pimg.src=d.photo;pimg.style.cssText="width:72px;height:72px;border-radius:10px;object-fit:cover;flex-shrink:0;";
-      pi.appendChild(pimg);
-      var pinfo=h("div","",{flex:"1"});
+      pi.appendChild(pimg);var pinfo=h("div","",{flex:"1"});
       if(r.skinType)pinfo.appendChild(h("div","",{marginBottom:"6px"},[stag(r.skinType)]));
       pinfo.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",lineHeight:"1.7"},[r.skinDiagnosis||""]));
-      if(r.urgencyLevel){
-        var uc={高:{bg:"var(--dbg)",c:"var(--dc)"},中:{bg:"var(--wbg)",c:"var(--wc)"},低:{bg:"var(--sbg)",c:"var(--sc)"}}[r.urgencyLevel]||{bg:"var(--p50)",c:"var(--p600)"};
-        pinfo.appendChild(h("div","",{marginTop:"8px"},[h("span","tag",{background:uc.bg,color:uc.c},["ケア優先度: "+r.urgencyLevel])]));
-      }
+      if(r.urgencyLevel){var uc={高:{bg:"var(--dbg)",c:"var(--dc)"},中:{bg:"var(--wbg)",c:"var(--wc)"},低:{bg:"var(--sbg)",c:"var(--sc)"}}[r.urgencyLevel]||{bg:"var(--p50)",c:"var(--p600)"};pinfo.appendChild(h("div","",{marginTop:"8px"},[h("span","tag",{background:uc.bg,color:uc.c},["ケア優先度: "+r.urgencyLevel])]));}
       pi.appendChild(pinfo);sb.appendChild(pi);
-    }else{
-      if(r.skinType)sb.appendChild(h("div","",{marginBottom:"6px"},[stag(r.skinType)]));
-      sb.appendChild(h("p","",{fontSize:"13px",fontWeight:"500",lineHeight:"1.7"},[r.skinDiagnosis||""]));
     }
     main.appendChild(sb);
-
-    /* 写真から判断したお悩み */
     var concerns=r.concerns||[];
-    if(concerns.length){
-      var cb=h("div","card",{marginBottom:"12px"});
-      cb.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"8px"},["写真から判断したお悩み"]));
-      var ctgs=h("div","",{display:"flex",flexWrap:"wrap",gap:"6px"});
-      for(var ci=0;ci<concerns.length;ci++)ctgs.appendChild(h("span","tag",{background:"var(--p50)",color:"var(--p600)"},[concerns[ci]]));
-      cb.appendChild(ctgs);main.appendChild(cb);
-    }
-
-    /* スコア */
+    if(concerns.length){var cb=h("div","card",{marginBottom:"12px"});cb.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"8px"},["写真から判断したお悩み"]));var ctgs=h("div","",{display:"flex",flexWrap:"wrap",gap:"6px"});for(var ci=0;ci<concerns.length;ci++)ctgs.appendChild(h("span","tag",{background:"var(--p50)",color:"var(--p600)"},[concerns[ci]]));cb.appendChild(ctgs);main.appendChild(cb);}
     if(r.skinCondition){
-      var scorebox=h("div","card",{marginBottom:"12px"});
-      scorebox.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"12px"},["肌コンディション（写真分析）"]));
+      var scorebox=h("div","card",{marginBottom:"12px"});scorebox.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"12px"},["肌コンディション（写真分析）"]));
       var scoreItems=[{key:"hydration",l:"保水力"},{key:"elasticity",l:"弾力"},{key:"sensitivity",l:"敏感度"},{key:"brightness",l:"透明感"}];
-      for(var si=0;si<scoreItems.length;si++){
-        (function(item){
-          var v=r.skinCondition[item.key]||5;
-          var bad=item.key==="sensitivity";
-          var col=bad?(v>=7?"var(--dc)":v>=4?"var(--wc)":"var(--sc)"):(v>=7?"var(--sc)":v>=4?"var(--wc)":"var(--dc)");
-          var bg=bad?(v>=7?"var(--dbg)":v>=4?"var(--wbg)":"var(--sbg)"):(v>=7?"var(--sbg)":v>=4?"var(--wbg)":"var(--dbg)");
-          var rw=h("div","",{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"});
-          var tr=h("div","btr");tr.appendChild(h("div","bf",{width:(v*10)+"%",background:col}));
-          rw.appendChild(h("div","",{width:"54px",fontSize:"12px",color:"var(--ts)"},[item.l]));
-          rw.appendChild(tr);
-          rw.appendChild(h("span","tag",{background:bg,color:col,minWidth:"26px",textAlign:"center"},[String(v)]));
-          scorebox.appendChild(rw);
-        })(scoreItems[si]);
-      }
+      for(var si=0;si<scoreItems.length;si++){(function(item){var v=r.skinCondition[item.key]||5;var bad=item.key==="sensitivity";var col=bad?(v>=7?"var(--dc)":v>=4?"var(--wc)":"var(--sc)"):(v>=7?"var(--sc)":v>=4?"var(--wc)":"var(--dc)");var bg=bad?(v>=7?"var(--dbg)":v>=4?"var(--wbg)":"var(--sbg)"):(v>=7?"var(--sbg)":v>=4?"var(--wbg)":"var(--dbg)");var rw=h("div","",{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"});var tr=h("div","btr");tr.appendChild(h("div","bf",{width:(v*10)+"%",background:col}));rw.appendChild(h("div","",{width:"54px",fontSize:"12px",color:"var(--ts)"},[item.l]));rw.appendChild(tr);rw.appendChild(h("span","tag",{background:bg,color:col,minWidth:"26px",textAlign:"center"},[String(v)]));scorebox.appendChild(rw);})(scoreItems[si]);}
       main.appendChild(scorebox);
     }
-
-    /* アドバイス */
     var advice=r.advice||[];
-    if(advice.length){
-      var ab=h("div","card",{marginBottom:"12px"});
-      ab.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"10px"},["スキンケアアドバイス"]));
-      for(var ai=0;ai<advice.length;ai++){
-        var rw2=h("div","",{display:"flex",gap:"8px",fontSize:"13px",color:"var(--tp)",lineHeight:"1.6",marginBottom:"8px"});
-        rw2.appendChild(h("span","",{color:"var(--p400)",flexShrink:"0"},["✦"]));
-        rw2.appendChild(txt(advice[ai]));
-        ab.appendChild(rw2);
-      }
-      main.appendChild(ab);
-    }
-
-    /* 商品カテゴリ */
+    if(advice.length){var ab=h("div","card",{marginBottom:"12px"});ab.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"10px"},["スキンケアアドバイス"]));for(var ai=0;ai<advice.length;ai++){var rw2=h("div","",{display:"flex",gap:"8px",fontSize:"13px",color:"var(--tp)",lineHeight:"1.6",marginBottom:"8px"});rw2.appendChild(h("span","",{color:"var(--p400)",flexShrink:"0"},["✦"]));rw2.appendChild(txt(advice[ai]));ab.appendChild(rw2);}main.appendChild(ab);}
     var pc=r.productCategories||[];
-    if(pc.length){
-      var pb=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",marginBottom:"16px"});
-      pb.appendChild(h("p","",{fontSize:"12px",fontWeight:"500",color:"var(--p800)",marginBottom:"10px"},["🌸 おすすめ商品カテゴリ（RIMAN KOREA）"]));
-      for(var pci=0;pci<pc.length;pci++)pb.appendChild(h("div","",{padding:"8px 12px",background:"var(--s2)",borderRadius:"8px",marginBottom:"6px",fontSize:"13px",color:"var(--p600)",fontWeight:"500"},[pc[pci]]));
-      pb.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["※ 商品タブにRIMAN商品を登録後、具体的な商品名で提案されます"]));
-      main.appendChild(pb);
-    }
-
+    if(pc.length){var pb=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",marginBottom:"16px"});pb.appendChild(h("p","",{fontSize:"12px",fontWeight:"500",color:"var(--p800)",marginBottom:"10px"},["🌸 おすすめ商品カテゴリ（RIMAN KOREA）"]));for(var pci=0;pci<pc.length;pci++)pb.appendChild(h("div","",{padding:"8px 12px",background:"var(--s2)",borderRadius:"8px",marginBottom:"6px",fontSize:"13px",color:"var(--p600)",fontWeight:"500"},[pc[pci]]));pb.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["※ 商品タブにRIMAN商品を登録後、具体的な商品名で提案されます"]));main.appendChild(pb);}
     var acts=h("div","",{display:"flex",flexDirection:"column",gap:"8px"});
     acts.appendChild(mkBtn("カルテに保存する",function(){
       var rec={id:genId(),date:today(),skinType:r.skinType||"",concerns:r.concerns||[],lifestyle:d.ls,note:d.note,skinDiagnosis:r.skinDiagnosis,skinCondition:r.skinCondition,advice:r.advice,productCategories:r.productCategories,urgencyLevel:r.urgencyLevel};
-      if(d.isNew){
-        var nc={id:genId(),name:d.newC.name,age:parseInt(d.newC.age)||0,phone:d.newC.phone,memo:"",skinType:r.skinType||"",concerns:r.concerns||[],diagnoses:[rec],lastDiagnosis:today(),createdAt:today()};
-        customers.push(nc);saveDB();S.selId=nc.id;
-      }else{
-        for(var i=0;i<customers.length;i++){
-          if(customers[i].id===d.cId){
-            customers[i].skinType=r.skinType||customers[i].skinType;
-            customers[i].concerns=r.concerns||customers[i].concerns;
-            customers[i].lastDiagnosis=today();
-            if(!customers[i].diagnoses)customers[i].diagnoses=[];
-            customers[i].diagnoses.push(rec);
-            break;
-          }
-        }
-        saveDB();S.selId=d.cId;
-      }
+      if(d.isNew){var nc={id:genId(),name:d.newC.name,age:parseInt(d.newC.age)||0,phone:d.newC.phone,memo:"",skinType:r.skinType||"",concerns:r.concerns||[],diagnoses:[rec],lastDiagnosis:today(),createdAt:today()};customers.push(nc);saveDB();S.selId=nc.id;}
+      else{for(var i=0;i<customers.length;i++){if(customers[i].id===d.cId){customers[i].skinType=r.skinType||customers[i].skinType;customers[i].concerns=r.concerns||customers[i].concerns;customers[i].lastDiagnosis=today();if(!customers[i].diagnoses)customers[i].diagnoses=[];customers[i].diagnoses.push(rec);break;}}saveDB();S.selId=d.cId;}
       S.view="detail";S.tab="members";render();
     },"btn bp bw"));
-    acts.appendChild(mkBtn("保存せずに戻る",function(){S.view="home";S.tab="home";render();},"btn bo bw"));
-    main.appendChild(acts);
+    acts.appendChild(mkBtn("保存せずに戻る",function(){S.view="home";S.tab="home";render();},"btn bo bw"));main.appendChild(acts);
   }
-
   rfD();
 }
 
-/* ===== PRODUCTS ===== */
+/* ===== 상품 ===== */
 function renderProducts(c){
-  var sc=h("div","scr",{textAlign:"center"});
-  sc.appendChild(h("h1","serif",{fontSize:"22px",fontWeight:"500",marginBottom:"32px"},["商品提案"]));
-  var ico=h("div","",{width:"80px",height:"80px",borderRadius:"50%",background:"var(--p50)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",border:"2px solid var(--p100)"});
-  ico.appendChild(ic("ti-leaf",{fontSize:"36px",color:"var(--p400)"}));
-  sc.appendChild(ico);
+  var sc=h("div","scr",{textAlign:"center"});sc.appendChild(h("h1","serif",{fontSize:"22px",fontWeight:"500",marginBottom:"32px"},["商品提案"]));
+  var ico=h("div","",{width:"80px",height:"80px",borderRadius:"50%",background:"var(--p50)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",border:"2px solid var(--p100)"});ico.appendChild(ic("ti-leaf",{fontSize:"36px",color:"var(--p400)"}));sc.appendChild(ico);
   sc.appendChild(h("h2","",{fontSize:"18px",fontWeight:"500",marginBottom:"8px"},["近日公開予定"]));
   sc.appendChild(h("p","",{fontSize:"14px",color:"var(--ts)",lineHeight:"1.8",maxWidth:"280px",margin:"0 auto 32px"},["RIMAN KOREAの商品データを登録すると、AI顔写真診断の結果に基づいてお客様一人ひとりに最適な商品を自動提案します。"]));
   var items=["肌タイプ別おすすめ商品","悩み別ケアプログラム","ステップ別スキンルーティン"];
-  for(var i=0;i<items.length;i++){
-    (function(item,idx){
-      var r=h("div","",{display:"flex",alignItems:"center",gap:"12px",padding:"14px 16px",background:"var(--s2)",borderRadius:"12px",marginBottom:"8px",border:"1px solid var(--p100)",textAlign:"left"});
-      r.appendChild(h("div","",{width:"28px",height:"28px",borderRadius:"50%",background:"var(--p50)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:"500",color:"var(--p600)",flexShrink:"0"},[String(idx+1)]));
-      r.appendChild(h("span","",{fontSize:"14px"},[item]));
-      sc.appendChild(r);
-    })(items[i],i);
-  }
+  for(var i=0;i<items.length;i++){(function(item,idx){var r=h("div","",{display:"flex",alignItems:"center",gap:"12px",padding:"14px 16px",background:"var(--s2)",borderRadius:"12px",marginBottom:"8px",border:"1px solid var(--p100)",textAlign:"left"});r.appendChild(h("div","",{width:"28px",height:"28px",borderRadius:"50%",background:"var(--p50)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:"500",color:"var(--p600)",flexShrink:"0"},[String(idx+1)]));r.appendChild(h("span","",{fontSize:"14px"},[item]));sc.appendChild(r);})(items[i],i);}
   c.appendChild(sc);
 }
 
-/* ===== INIT ===== */
 render();
 </script>
 </body>
