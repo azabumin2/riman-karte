@@ -182,11 +182,79 @@ function startDiag(cId){
     return;
   }
   if(isLimitReached()){showLimitScreen();return;}
+  /* 동의 여부 체크 - 세션당 1회만 표시 */
+  if(!sessionStorage.getItem("riman_agreed")){
+    showConsentScreen(function(){
+      sessionStorage.setItem("riman_agreed","1");
+      S.diag=newDiag();
+      if(cId)S.diag.cId=cId;
+      S.diag.step=cId?1:0;
+      S.view="diagnosis";S.tab="diagnosis";
+      render();
+    });
+    return;
+  }
   S.diag=newDiag();
   if(cId)S.diag.cId=cId;
   S.diag.step=cId?1:0;
   S.view="diagnosis";S.tab="diagnosis";
   render();
+}
+
+/* ===== 동의 화면 ===== */
+function showConsentScreen(callback){
+  var mr=document.getElementById("modal");mr.innerHTML="";
+  var ov=h("div","movo");
+  var m=h("div","mov");
+
+  m.appendChild(h("div","",{textAlign:"center",marginBottom:"16px"},[
+    h("div","",{fontSize:"36px",marginBottom:"6px"},["📋"]),
+    h("h2","serif",{fontSize:"18px",fontWeight:"500",color:"var(--p600)"},["ご利用前にご確認ください"])
+  ]));
+
+  /* 개인정보 안내 */
+  var box1=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",marginBottom:"10px"});
+  box1.appendChild(h("p","",{fontSize:"12px",fontWeight:"500",color:"var(--p800)",marginBottom:"8px"},["📸 顔写真・個人情報の取り扱いについて"]));
+  var items1=["撮影した顔写真はAI肌診断のみに使用します","写真はAnthropicのAIサービスに送信されます","写真・診断結果はお客様の端末にのみ保存されます","当社のサーバーへの保存・第三者への提供は行いません","写真データはいつでもブラウザの設定から削除できます"];
+  for(var i=0;i<items1.length;i++){
+    var r=h("div","",{display:"flex",gap:"6px",fontSize:"12px",color:"var(--ts)",lineHeight:"1.6",marginBottom:"3px"});
+    r.appendChild(h("span","",{color:"var(--p400)",flexShrink:"0"},["✦"]));
+    r.appendChild(document.createTextNode(items1[i]));
+    box1.appendChild(r);
+  }
+  m.appendChild(box1);
+
+  /* 의료 진단 아님 주의문 */
+  var box2=h("div","card",{background:"var(--wbg)",border:"1px solid #FFD180",marginBottom:"16px"});
+  box2.appendChild(h("p","",{fontSize:"12px",fontWeight:"500",color:"var(--wc)",marginBottom:"8px"},["⚠️ 医療診断ではありません"]));
+  var items2=["本サービスはAIによる肌の参考情報の提供です","医療診断・治療の代替となるものではありません","肌のトラブルは皮膚科専門医にご相談ください","診断結果はあくまでも参考としてご活用ください"];
+  for(var j=0;j<items2.length;j++){
+    var r2=h("div","",{display:"flex",gap:"6px",fontSize:"12px",color:"var(--wc)",lineHeight:"1.6",marginBottom:"3px"});
+    r2.appendChild(h("span","",{flexShrink:"0"},["⚠"]));
+    r2.appendChild(document.createTextNode(items2[j]));
+    box2.appendChild(r2);
+  }
+  m.appendChild(box2);
+
+  /* 체크박스 */
+  var chkRow=h("div","",{display:"flex",alignItems:"flex-start",gap:"10px",marginBottom:"16px",padding:"12px",background:"var(--s1)",borderRadius:"10px"});
+  var chk=document.createElement("input");chk.type="checkbox";chk.id="consent-chk";
+  chk.style.cssText="width:18px;height:18px;margin-top:1px;accent-color:var(--p400);flex-shrink:0;cursor:pointer;";
+  var chkLabel=document.createElement("label");chkLabel.htmlFor="consent-chk";
+  chkLabel.style.cssText="font-size:13px;color:var(--tp);line-height:1.6;cursor:pointer;";
+  chkLabel.textContent="上記の内容を確認し、顔写真・個人情報の取り扱いおよび免責事項に同意します";
+  chkRow.appendChild(chk);chkRow.appendChild(chkLabel);m.appendChild(chkRow);
+
+  var agreeBtn=mkBtn("同意して診断へ進む",function(){
+    if(!chk.checked){alert("同意のチェックをお願いします。");return;}
+    mr.innerHTML="";callback();
+  },"btn bp bw");
+  m.appendChild(agreeBtn);
+  m.appendChild(h("div","",{height:"8px"}));
+  m.appendChild(mkBtn("キャンセル",function(){mr.innerHTML="";},"btn bg bw"));
+
+  ov.appendChild(m);
+  mr.appendChild(ov);
 }
 
 /* ===== 네비게이션 ===== */
@@ -548,6 +616,9 @@ function renderDiag(c){
     if(advice.length){var ab=h("div","card",{marginBottom:"12px"});ab.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",fontWeight:"500",marginBottom:"10px"},["スキンケアアドバイス"]));for(var ai=0;ai<advice.length;ai++){var rw2=h("div","",{display:"flex",gap:"8px",fontSize:"13px",color:"var(--tp)",lineHeight:"1.6",marginBottom:"8px"});rw2.appendChild(h("span","",{color:"var(--p400)",flexShrink:"0"},["✦"]));rw2.appendChild(txt(advice[ai]));ab.appendChild(rw2);}main.appendChild(ab);}
     var pc=r.productCategories||[];
     if(pc.length){var pb=h("div","card",{background:"var(--p50)",border:"1px solid var(--p100)",marginBottom:"16px"});pb.appendChild(h("p","",{fontSize:"12px",fontWeight:"500",color:"var(--p800)",marginBottom:"10px"},["🌸 おすすめ商品カテゴリ（RIMAN KOREA）"]));for(var pci=0;pci<pc.length;pci++)pb.appendChild(h("div","",{padding:"8px 12px",background:"var(--s2)",borderRadius:"8px",marginBottom:"6px",fontSize:"13px",color:"var(--p600)",fontWeight:"500"},[pc[pci]]));pb.appendChild(h("p","",{fontSize:"11px",color:"var(--tm)",marginTop:"8px"},["※ 商品タブにRIMAN商品を登録後、具体的な商品名で提案されます"]));main.appendChild(pb);}
+    /* 결과 화면 하단 주의문 */
+    main.appendChild(h("div","",{background:"var(--wbg)",border:"1px solid #FFD180",borderRadius:"10px",padding:"10px 14px",marginBottom:"12px",fontSize:"11px",color:"var(--wc)",lineHeight:"1.7"},["⚠️ 本診断はAIによる参考情報です。医療診断ではありません。肌のトラブルは皮膚科専門医にご相談ください。"]));
+
     var acts=h("div","",{display:"flex",flexDirection:"column",gap:"8px"});
     acts.appendChild(mkBtn("カルテに保存する",function(){
       var rec={id:genId(),date:today(),skinType:r.skinType||"",concerns:r.concerns||[],lifestyle:d.ls,note:d.note,skinDiagnosis:r.skinDiagnosis,skinCondition:r.skinCondition,advice:r.advice,productCategories:r.productCategories,urgencyLevel:r.urgencyLevel};
